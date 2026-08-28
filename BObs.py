@@ -2,12 +2,14 @@ import os
 import json
 import logging
 import datetime
+import threading
 from datetime import timezone, timedelta
 
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from flask import Flask
 
 load_dotenv()  # โหลดค่าจากไฟล์ .env เข้าสู่ environment variables
 
@@ -23,6 +25,30 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger("bobbot")
+
+# ---------------------------------------------------------
+# Keep-alive HTTP server (สำหรับ Render Free Plan)
+# ---------------------------------------------------------
+# Render free tier จะ sleep service ถ้าไม่มี HTTP request เข้ามาใน 15 นาที
+# เปิด Flask server เล็ก ๆ ไว้ ให้บริการ ping ภายนอก (เช่น UptimeRobot) ยิงเข้ามาได้
+keep_alive_app = Flask(__name__)
+
+
+@keep_alive_app.route("/")
+def keep_alive_home():
+    return "BOB_BOT is alive!", 200
+
+
+def run_keep_alive_server():
+    port = int(os.getenv("PORT", 10000))  # Render จะกำหนด PORT ผ่าน env ให้อัตโนมัติ
+    keep_alive_app.run(host="0.0.0.0", port=port)
+
+
+def start_keep_alive():
+    thread = threading.Thread(target=run_keep_alive_server, daemon=True)
+    thread.start()
+    logger.info("เริ่ม keep-alive HTTP server แล้ว")
+
 
 # ---------------------------------------------------------
 # อ่านค่า TOKEN ให้ถูกต้อง (แก้บั๊กเดิมที่เอา token ไปเป็น "ชื่อ" env var)
@@ -820,6 +846,7 @@ if __name__ == "__main__":
             "แล้วใส่ DISCORD_TOKEN=โทเคนของคุณ ก่อนรันบอท"
         )
     else:
+        start_keep_alive()  # เปิด HTTP server เล็ก ๆ ไว้ก่อน เพื่อให้ Render ping ได้
         try:
             # discord.py มี reconnect logic ในตัวอยู่แล้วสำหรับการหลุดชั่วคราว
             bot.run(TOKEN, log_handler=None)
