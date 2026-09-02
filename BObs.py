@@ -136,6 +136,38 @@ def save_ticket_config(config: dict) -> None:
 ticket_config = load_ticket_config()
 
 
+# ---------- ระบบเก็บค่าแผงแจกไฟล์/เทมเพลต (Script/File Hub Panel) ----------
+SCRIPTHUB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "scripthub_config.json")
+SCRIPTHUB_FILES_DIR = os.path.join(os.path.dirname(__file__), "scripthub_files")
+os.makedirs(SCRIPTHUB_FILES_DIR, exist_ok=True)
+
+
+def load_scripthub_config() -> dict:
+    if os.path.exists(SCRIPTHUB_CONFIG_PATH):
+        try:
+            with open(SCRIPTHUB_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            logger.warning("อ่านไฟล์ scripthub_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            return {}
+    return {}
+
+
+def save_scripthub_config(config: dict) -> None:
+    with open(SCRIPTHUB_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+# โครงสร้าง:
+# { "guild_id": {
+#     "channel_id": int, "message_id": int,
+#     "title": str, "description": str, "image_url": str|None,
+#     "items": [ {"label": str, "description": str, "content": str|None,
+#                 "file_path": str|None, "file_name": str|None} ]
+# } }
+scripthub_config = load_scripthub_config()
+
+
 # =========================================================
 # ระบบยืนยันตัวตน (Verification) — กดปุ่มแล้วรับยศทันที
 # =========================================================
@@ -317,12 +349,119 @@ class TicketCloseView(discord.ui.View):
             pass
 
 
+# =========================================================
+# ระบบแผงแจกไฟล์/เทมเพลต (Script/File Hub Panel)
+# — ผู้ใช้เลือกรายการจาก dropdown แล้วบอทจะส่งไฟล์/ข้อความเข้า DM ให้อัตโนมัติ
+# =========================================================
+class ScriptHubSelect(discord.ui.Select):
+    def __init__(self, guild_id: int, items: list):
+        options = [
+            discord.SelectOption(
+                label=item["label"][:100],
+                description=(item.get("description") or "")[:100],
+                value=item["label"],
+            )
+            for item in items[:25]  # Discord จำกัดตัวเลือกใน select ไว้ที่ 25
+        ]
+        if not options:
+            options = [discord.SelectOption(label="ยังไม่มีรายการ", value="__empty__")]
+        super().__init__(
+            placeholder="Choose a script...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id=f"scripthub_select_{guild_id}",
+        )
+        self.guild_id = guild_id
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "__empty__":
+            await interaction.response.send_message(
+                "❌ ยังไม่มีรายการให้เลือก กรุณาแจ้งแอดมินให้เพิ่มด้วย /scripthub_additem", ephemeral=True
+            )
+            return
+
+        conf = scripthub_config.get(str(self.guild_id), {})
+        items = conf.get("items", [])
+        chosen = next((i for i in items if i["label"] == self.values[0]), None)
+
+        if not chosen:
+            await interaction.response.send_message(
+                "❌ ไม่พบรายการนี้แล้ว (อาจถูกลบไป) กรุณากด Refresh Menu แล้วลองใหม่", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            files = None
+            file_path = chosen.get("file_path")
+            if file_path and os.path.exists(file_path):
+                files = [discord.File(file_path, filename=chosen.get("file_name") or os.path.basename(file_path))]
+
+            dm_content = chosen.get("content") or f"นี่คือไฟล์ **{chosen['label']}** ของคุณค่ะ"
+            await interaction.user.send(content=dm_content, files=files)
+            await interaction.followup.send(
+                f"✅ ส่ง **{chosen['label']}** เข้า DM ให้แล้ว ตรวจสอบกล่องข้อความส่วนตัวได้เลยครับ", ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "❌ ส่ง DM ไม่ได้ กรุณาเปิดรับข้อความส่วนตัวจากสมาชิกในเซิร์ฟเวอร์นี้ก่อน (ตั้งค่า Privacy Settings)",
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            logger.exception(f"ส่งไฟล์ scripthub ไม่สำเร็จ: {chosen['label']}")
+            await interaction.followup.send("❌ เกิดข้อผิดพลาดระหว่างส่งไฟล์ กรุณาลองใหม่อีกครั้ง", ephemeral=True)
+
+
+class ScriptHubRefreshButton(discord.ui.Button):
+    def __init__(self, guild_id: int):
+        super().__init__(
+            label="Refresh Menu",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"scripthub_refresh_{guild_id}",
+        )
+        self.guild_id = guild_id
+
+    async def callback(self, interaction: discord.Interaction):
+        conf = scripthub_config.get(str(self.guild_id), {})
+        items = conf.get("items", [])
+        new_view = ScriptHubView(self.guild_id, items)
+        await interaction.response.edit_message(view=new_view)
+
+
+class ScriptHubView(discord.ui.View):
+    def __init__(self, guild_id: int, items: list):
+        super().__init__(timeout=None)  # ปุ่ม/เมนูถาวร ใช้ได้ตลอดแม้บอทรีสตาร์ท
+        self.add_item(ScriptHubSelect(guild_id, items))
+        self.add_item(ScriptHubRefreshButton(guild_id))
+
+
+def build_scripthub_embed(conf: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title=conf.get("title") or "SCRIPT HUB PANEL",
+        description=conf.get("description")
+        or "Select a script from the dropdown menu below to receive it directly in your Direct Messages.",
+        color=discord.Color.blurple(),
+    )
+    if conf.get("image_url"):
+        embed.set_image(url=conf["image_url"])
+    embed.set_footer(text=f"Powered by {bot.user.name if bot.user else 'BOB_BOT'}")
+    return embed
+
+
 @bot.event
 async def on_ready():
     logger.info(f"เข้าสู่ระบบในชื่อ {bot.user} (ID: {bot.user.id})")
     bot.add_view(VerifyView())  # ลงทะเบียนปุ่มถาวรใหม่ทุกครั้งที่บอทออนไลน์/รีสตาร์ท
     bot.add_view(TicketOpenView())
     bot.add_view(TicketCloseView())
+    # ลงทะเบียนแผงแจกไฟล์/เทมเพลตของทุกเซิร์ฟเวอร์ที่เคยตั้งค่าไว้
+    for guild_id_str, conf in scripthub_config.items():
+        try:
+            bot.add_view(ScriptHubView(int(guild_id_str), conf.get("items", [])))
+        except (ValueError, TypeError):
+            logger.warning(f"ลงทะเบียนแผง scripthub ของ guild {guild_id_str} ไม่สำเร็จ")
     try:
         synced = await bot.tree.sync()
         logger.info(f"ซิงค์ slash command แล้ว {len(synced)} คำสั่ง")
@@ -721,6 +860,177 @@ async def closeticket(interaction: discord.Interaction):
 
 
 # =========================================================
+# หมวด: แผงแจกไฟล์/เทมเพลต (Script/File Hub Panel)
+# =========================================================
+
+@bot.tree.command(name="scripthub_setup", description="สร้าง/อัปเดตแผงแจกไฟล์-เทมเพลต (มีเมนู dropdown ให้เลือก)")
+@app_commands.describe(
+    title="หัวข้อของแผง เช่น SCRIPT HUB PANEL",
+    description="คำอธิบายใต้หัวข้อ",
+    image_url="URL รูปภาพประกอบ (ไม่ใส่ก็ได้)",
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def scripthub_setup(
+    interaction: discord.Interaction, title: str, description: str, image_url: str = None
+):
+    guild_id = str(interaction.guild.id)
+    conf = scripthub_config.get(guild_id, {"items": []})
+    conf["title"] = title
+    conf["description"] = description
+    conf["image_url"] = image_url
+
+    embed = build_scripthub_embed(conf)
+    view = ScriptHubView(interaction.guild.id, conf.get("items", []))
+
+    await interaction.response.send_message("✅ กำลังสร้างแผง...", ephemeral=True)
+    msg = await interaction.channel.send(embed=embed, view=view)
+
+    conf["channel_id"] = interaction.channel.id
+    conf["message_id"] = msg.id
+    scripthub_config[guild_id] = conf
+    save_scripthub_config(scripthub_config)
+
+    await interaction.edit_original_response(content="✅ สร้างแผงเรียบร้อย ใช้ /scripthub_additem เพื่อเพิ่มรายการต่อได้เลย")
+
+
+@bot.tree.command(name="scripthub_additem", description="เพิ่มรายการไฟล์/เทมเพลตเข้าแผง (แนบไฟล์ หรือใส่ข้อความก็ได้)")
+@app_commands.describe(
+    label="ชื่อรายการที่จะแสดงในเมนู (สั้น ๆ ไม่เกิน 100 ตัวอักษร)",
+    description="คำอธิบายสั้น ๆ ของรายการ (แสดงในเมนู)",
+    content="ข้อความที่จะแนบไปกับ DM (ไม่ใส่ก็ได้ ถ้าแนบไฟล์)",
+    file="ไฟล์ที่จะส่งให้ผู้ใช้ (ไม่ใส่ก็ได้ ถ้ามีแค่ข้อความ)",
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def scripthub_additem(
+    interaction: discord.Interaction,
+    label: str,
+    description: str = "",
+    content: str = None,
+    file: discord.Attachment = None,
+):
+    if not content and not file:
+        await interaction.response.send_message(
+            "❌ ต้องใส่อย่างน้อยหนึ่งอย่าง: ข้อความ (content) หรือไฟล์แนบ (file)", ephemeral=True
+        )
+        return
+
+    guild_id = str(interaction.guild.id)
+    conf = scripthub_config.get(guild_id)
+    if not conf:
+        await interaction.response.send_message(
+            "❌ ยังไม่ได้สร้างแผงในเซิร์ฟเวอร์นี้ กรุณาใช้ /scripthub_setup ก่อน", ephemeral=True
+        )
+        return
+
+    items = conf.setdefault("items", [])
+    if any(i["label"] == label for i in items):
+        await interaction.response.send_message("❌ มีรายการชื่อนี้อยู่แล้ว กรุณาใช้ชื่ออื่น", ephemeral=True)
+        return
+    if len(items) >= 25:
+        await interaction.response.send_message("❌ แผงนี้มีรายการครบ 25 แล้ว (ข้อจำกัดของ Discord)", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    file_path = None
+    file_name = None
+    if file:
+        guild_dir = os.path.join(SCRIPTHUB_FILES_DIR, guild_id)
+        os.makedirs(guild_dir, exist_ok=True)
+        safe_name = "".join(c for c in file.filename if c.isalnum() or c in "._- ") or "file"
+        file_path = os.path.join(guild_dir, f"{label}_{safe_name}")
+        await file.save(file_path)
+        file_name = file.filename
+
+    items.append(
+        {
+            "label": label,
+            "description": description,
+            "content": content,
+            "file_path": file_path,
+            "file_name": file_name,
+        }
+    )
+    save_scripthub_config(scripthub_config)
+
+    # อัปเดตแผงที่แสดงอยู่จริง (ถ้ามี) ให้เมนูมีตัวเลือกใหม่ทันที
+    updated_live = False
+    if conf.get("channel_id") and conf.get("message_id"):
+        try:
+            channel = interaction.guild.get_channel(int(conf["channel_id"]))
+            msg = await channel.fetch_message(int(conf["message_id"]))
+            await msg.edit(view=ScriptHubView(interaction.guild.id, items))
+            updated_live = True
+        except (discord.NotFound, discord.Forbidden, AttributeError):
+            pass
+
+    note = "และอัปเดตแผงที่แสดงอยู่ให้แล้ว" if updated_live else "(หาแผงที่แสดงอยู่ไม่เจอ ลองกด Refresh Menu บนแผงเอง)"
+    await interaction.followup.send(f"✅ เพิ่มรายการ **{label}** เรียบร้อย {note}", ephemeral=True)
+
+
+@bot.tree.command(name="scripthub_removeitem", description="ลบรายการไฟล์/เทมเพลตออกจากแผง")
+@app_commands.describe(label="ชื่อรายการที่ต้องการลบ")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def scripthub_removeitem(interaction: discord.Interaction, label: str):
+    guild_id = str(interaction.guild.id)
+    conf = scripthub_config.get(guild_id)
+    if not conf or not conf.get("items"):
+        await interaction.response.send_message("❌ ยังไม่มีรายการใด ๆ ในแผงนี้", ephemeral=True)
+        return
+
+    items = conf["items"]
+    target = next((i for i in items if i["label"] == label), None)
+    if not target:
+        await interaction.response.send_message("❌ ไม่พบรายการนี้", ephemeral=True)
+        return
+
+    items.remove(target)
+    if target.get("file_path") and os.path.exists(target["file_path"]):
+        try:
+            os.remove(target["file_path"])
+        except OSError:
+            pass
+    save_scripthub_config(scripthub_config)
+
+    updated_live = False
+    if conf.get("channel_id") and conf.get("message_id"):
+        try:
+            channel = interaction.guild.get_channel(int(conf["channel_id"]))
+            msg = await channel.fetch_message(int(conf["message_id"]))
+            await msg.edit(view=ScriptHubView(interaction.guild.id, items))
+            updated_live = True
+        except (discord.NotFound, discord.Forbidden, AttributeError):
+            pass
+
+    note = "และอัปเดตแผงที่แสดงอยู่ให้แล้ว" if updated_live else "(ลองกด Refresh Menu บนแผงเอง)"
+    await interaction.response.send_message(f"✅ ลบรายการ **{label}** แล้ว {note}", ephemeral=True)
+
+
+@bot.tree.command(name="scripthub_listitems", description="ดูรายการไฟล์/เทมเพลตทั้งหมดในแผงของเซิร์ฟเวอร์นี้")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def scripthub_listitems(interaction: discord.Interaction):
+    guild_id = str(interaction.guild.id)
+    conf = scripthub_config.get(guild_id)
+    items = conf.get("items", []) if conf else []
+
+    if not items:
+        await interaction.response.send_message("📭 ยังไม่มีรายการในแผงนี้", ephemeral=True)
+        return
+
+    lines = []
+    for i in items:
+        kind = "📎 ไฟล์" if i.get("file_path") else "💬 ข้อความ"
+        lines.append(f"• **{i['label']}** — {i.get('description') or '-'} ({kind})")
+
+    embed = discord.Embed(
+        title="📋 รายการในแผงแจกไฟล์/เทมเพลต",
+        description="\n".join(lines),
+        color=discord.Color.blurple(),
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+# =========================================================
 # หมวด: คำสั่งทั่วไป (General Commands)
 # =========================================================
 
@@ -814,6 +1124,16 @@ async def help_command(interaction: discord.Interaction):
         value=(
             "`/setupticket` — ตั้งค่า+ส่งข้อความเปิดทิกเก็ต\n"
             "`/closeticket` — ปิดทิกเก็ตปัจจุบัน (หรือกดปุ่มในห้องทิกเก็ต)"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="📂 แผงแจกไฟล์/เทมเพลต (Script Hub)",
+        value=(
+            "`/scripthub_setup` — สร้าง/อัปเดตแผง (มีเมนู dropdown)\n"
+            "`/scripthub_additem` — เพิ่มรายการไฟล์/ข้อความเข้าแผง\n"
+            "`/scripthub_removeitem` — ลบรายการออกจากแผง\n"
+            "`/scripthub_listitems` — ดูรายการทั้งหมดในแผง"
         ),
         inline=False
     )
