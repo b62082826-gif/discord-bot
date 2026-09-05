@@ -1,4 +1,4 @@
-(import os
+import os
 import json
 import logging
 import datetime
@@ -8,7 +8,8 @@ from collections import deque
 from datetime import timezone, timedelta
 
 import discord
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -196,8 +197,9 @@ TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 AI_MODEL = os.getenv("AI_MODEL", "gemini-2.0-flash")
 
+genai_client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    genai_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
     logger.warning("ไม่พบ GEMINI_API_KEY — ระบบ AI ตอบแชทจะทำงานไม่ได้จนกว่าจะตั้งค่าใน .env")
 
@@ -352,17 +354,21 @@ def get_ai_history(channel_id: int) -> deque:
 
 
 async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_message: str) -> str:
-    """เรียก Google Gemini API เพื่อสร้างคำตอบ โดยใช้ประวัติแชทสั้น ๆ ของห้องนั้นประกอบ context"""
-    if not GEMINI_API_KEY:
+    """เรียก Google Gemini API (SDK ใหม่ google-genai) เพื่อสร้างคำตอบ โดยใช้ประวัติแชทสั้น ๆ ของห้องนั้นประกอบ context"""
+    if not genai_client:
         return "❌ ยังไม่ได้ตั้งค่า GEMINI_API_KEY บนเซิร์ฟเวอร์ที่รันบอท กรุณาแจ้งผู้ดูแลบอทให้ตั้งค่าใน .env"
 
     history = get_ai_history(channel_id)
-    new_turn = {"role": "user", "parts": [f"{user_name}: {user_message}"]}
+    # SDK ใหม่ต้องการให้แต่ละ part เป็น dict {"text": ...} แทนสตริงตรง ๆ แบบ SDK เก่า
+    new_turn = {"role": "user", "parts": [{"text": f"{user_name}: {user_message}"}]}
     contents = list(history) + [new_turn]
 
     def call_api():
-        model = genai.GenerativeModel(model_name=AI_MODEL, system_instruction=persona)
-        return model.generate_content(contents)
+        return genai_client.models.generate_content(
+            model=AI_MODEL,
+            contents=contents,
+            config=types.GenerateContentConfig(system_instruction=persona),
+        )
 
     try:
         response = await asyncio.to_thread(call_api)
@@ -377,7 +383,7 @@ async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_
     # เก็บทั้งคำถามและคำตอบไว้เป็น context สำหรับข้อความถัดไปในห้องเดียวกัน
     # Gemini ใช้ role "model" แทน "assistant"
     history.append(new_turn)
-    history.append({"role": "model", "parts": [reply_text]})
+    history.append({"role": "model", "parts": [{"text": reply_text}]})
     return reply_text
 
 
