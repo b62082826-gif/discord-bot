@@ -1,4 +1,4 @@
-import os
+(import os
 import json
 import logging
 import datetime
@@ -102,57 +102,6 @@ CUSTOM_EMOJI_NAMES = {
     "fun_crewmate": "bluecrewmate",
 }
 
-bot.startup_done = False # ใช้กันไม่ให้ sync คำสั่ง/โหลด emoji ซ้ำทุกครั้งที่ reconnect (กัน global rate limit)
-
-@bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    # เช็คว่า Error เกิดจากผู้ใช้รันคำสั่งขณะติด Cooldown ใช่หรือไม่
-    if isinstance(error, app_commands.CommandOnCooldown):
-        # ปัดเศษวินาทีให้เป็นจำนวนเต็มเพื่อง่ายต่อการอ่าน
-        retry_after = math.ceil(error.retry_after) 
-        
-        embed = discord.Embed(
-            title="⏳ รอก่อนน้า",
-            description=f"คุณส่งคำสั่งนี้เร็วเกินไป โปรดรออีก **{retry_after} วินาที**",
-            color=discord.Color.orange() # ใช้สีส้มเพื่อเตือน
-        )
-        # ส่งข้อความเตือนแบบ Ephemeral (เห็นคนเดียว)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    
-    # เช็คว่า Error เกิดจากผู้ใช้ไม่มีสิทธิ์ (Permissions)
-    elif isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message("❌ คุณไม่มีสิทธิ์ใช้งานคำสั่งนี้", ephemeral=True)
-        
-    else:
-        # หากเป็น Error ประเภทอื่นๆ ก็ให้ล็อกไว้
-        print(f"เกิดข้อผิดพลาดจาก Slash Command: {error}")
-        # สามารถแจ้งให้ผู้ใช้ทราบแบบกว้างๆ ได้
-        if not interaction.response.is_done():
-            await interaction.response.send_message("❌ เกิดข้อผิดพลาดในการรันคำสั่ง โปรดลองใหม่ภายหลัง", ephemeral=True)
-
-# ---------------------------------------------------------
-# ระบบดักจับ Error สำหรับ Prefix Commands (!คำสั่ง)
-# ---------------------------------------------------------
-@bot.event
-async def on_command_error(ctx, error):
-    # เช็คว่า Error เกิดจากผู้ใช้รันคำสั่งขณะติด Cooldown ใช่หรือไม่
-    if isinstance(error, commands.CommandOnCooldown):
-        retry_after = math.ceil(error.retry_after)
-        
-        embed = discord.Embed(
-            title="⏳ ใจเย็นๆ ก่อน",
-            description=f"คำสั่งในห้องนี้ติด Cooldown อยู่ โปรดรออีก **{retry_after} วินาที**",
-            color=discord.Color.orange()
-        )
-        # ใช้ delete_after เพื่อให้ข้อความเตือนลบตัวเองไปใน 5 วินาที (ไม่รกแชท)
-        await ctx.send(embed=embed, delete_after=5.0)
-
-    # เช็คว่าเกิดจากผู้ใช้พิมพ์คำสั่งที่ไม่มีอยู่จริงหรือไม่
-    elif isinstance(error, commands.CommandNotFound):
-        pass # ปล่อยผ่านไป ไม่ต้องตอบกลับอะไร เพื่อไม่ให้บอทสแปม
-
-    else:
-        print(f"เกิดข้อผิดพลาดจาก Prefix Command: {error}")
 # เก็บ Emoji object ของแอปบอทหลังโหลดจาก Discord (ตอน on_ready)
 custom_emoji_cache: dict[str, "discord.Emoji"] = {}
 
