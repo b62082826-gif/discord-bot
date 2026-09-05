@@ -10,6 +10,7 @@ from datetime import timezone, timedelta
 import discord
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
 from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -372,10 +373,9 @@ async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_
 
     try:
         response = await asyncio.to_thread(call_api)
-    except Exception as e:
+    except Exception:
         logger.exception("เรียก Gemini API ไม่สำเร็จ")
-        # DEBUG ชั่วคราว: โชว์ error จริงออกมาด้วย เพื่อหาสาเหตุ — ลบ/คอมเมนต์บรรทัด repr(e) ออกทีหลังตอนแก้เสร็จ
-        return f"❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้\n```{repr(e)}```"
+        return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้งภายหลัง"
 
     reply_text = (getattr(response, "text", None) or "").strip()
     if not reply_text:
