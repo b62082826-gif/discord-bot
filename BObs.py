@@ -195,7 +195,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 # ระบบ AI ตอบแชท (Google Gemini API)
 # ---------------------------------------------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-AI_MODEL = os.getenv("AI_MODEL", "gemini-2.0-flash")
+AI_MODEL = os.getenv("AI_MODEL", "gemini-3.6-flash")
 
 genai_client = None
 if GEMINI_API_KEY:
