@@ -372,9 +372,10 @@ async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_
 
     try:
         response = await asyncio.to_thread(call_api)
-    except Exception:
+    except Exception as e:
         logger.exception("เรียก Gemini API ไม่สำเร็จ")
-        return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้งภายหลัง"
+        # DEBUG ชั่วคราว: โชว์ error จริงออกมาด้วย เพื่อหาสาเหตุ — ลบ/คอมเมนต์บรรทัด repr(e) ออกทีหลังตอนแก้เสร็จ
+        return f"❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้\n```{repr(e)}```"
 
     reply_text = (getattr(response, "text", None) or "").strip()
     if not reply_text:
