@@ -7,6 +7,7 @@ import asyncio
 from collections import deque
 from datetime import timezone, timedelta
 
+import aiohttp
 import discord
 from google import genai
 from google.genai import types
@@ -42,6 +43,7 @@ class Theme:
     INFO = discord.Color.from_rgb(88, 164, 255)          # ฟ้าสด
     TICKET = discord.Color.from_rgb(59, 165, 93)         # เขียวเข้ม
     SCRIPTHUB = discord.Color.from_rgb(153, 69, 255)     # ม่วงสด
+    ROLIMONS = discord.Color.from_rgb(66, 135, 245)      # ฟ้า Rolimon's
 
     DIVIDER = "─────────────────────"
 
@@ -417,6 +419,151 @@ def safe_filename_part(text: str, fallback: str = "item") -> str:
     """กรองข้อความให้เหลือเฉพาะอักขระที่ปลอดภัยสำหรับใช้ประกอบชื่อไฟล์/พาธ (กัน path traversal)"""
     cleaned = "".join(c for c in text if c.isalnum() or c in "._- ").strip()
     return cleaned or fallback
+
+
+# =========================================================
+# ระบบดึงข้อมูล Roblox/Rolimon's (RAP, Value, Collectibles, Value Rank)
+# — ใช้กับคำสั่ง /user เพื่อแสดงสถิติสไตล์ RoliBot
+# =========================================================
+# ต้องใส่ User-Agent + Referer ปลอมเป็นเบราว์เซอร์จริง ไม่งั้น Rolimon's มักตอบ 403
+ROLIMONS_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://www.rolimons.com/",
+}
+
+
+async def resolve_roblox_user(query: str) -> dict | None:
+    """แปลงชื่อผู้ใช้ (หรือ User ID) ที่ผู้ใช้พิมพ์ ให้เป็นข้อมูล Roblox จริง
+    คืนค่า {"id": int, "name": str, "display_name": str} หรือ None ถ้าหาไม่เจอ"""
+    query = query.strip()
+    try:
+        async with aiohttp.ClientSession() as session:
+            if query.isdigit():
+                async with session.get(
+                    f"https://users.roblox.com/v1/users/{query}",
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status != 200:
+                        return None
+                    data = await resp.json()
+                    return {
+                        "id": data["id"],
+                        "name": data["name"],
+                        "display_name": data.get("displayName") or data["name"],
+                    }
+            else:
+                payload = {"usernames": [query], "excludeBannedUsers": False}
+                async with session.post(
+                    "https://users.roblox.com/v1/usernames/users",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status != 200:
+                        return None
+                    data = await resp.json()
+                    results = data.get("data") or []
+                    if not results:
+                        return None
+                    found = results[0]
+                    return {
+                        "id": found["id"],
+                        "name": found["name"],
+                        "display_name": found.get("displayName") or found["name"],
+                    }
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        logger.exception("ค้นหาผู้ใช้ Roblox ไม่สำเร็จ")
+        return None
+
+
+async def fetch_rolimons_playerinfo(user_id: int) -> dict | None:
+    """ดึงข้อมูล RAP/Value/Rank จาก Rolimon's — คืน None ถ้าหาไม่เจอ/ถูกบล็อก (403)"""
+    url = f"https://api.rolimons.com/players/v1/playerinfo/{user_id}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url, headers=ROLIMONS_HEADERS, timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning(f"Rolimon's playerinfo ตอบ HTTP {resp.status} สำหรับ user {user_id}")
+                    return None
+                data = await resp.json()
+                if data.get("success") is False:
+                    return None
+                return data
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        logger.exception("เรียก Rolimon's playerinfo ไม่สำเร็จ")
+        return None
+
+
+async def fetch_rolimons_collectibles(user_id: int) -> int | None:
+    """นับจำนวนไอเทม (collectibles) ทั้งหมดจาก playerassets ของ Rolimon's — คืน None ถ้าดึงไม่ได้/ปิดความเป็นส่วนตัว"""
+    url = f"https://api.rolimons.com/players/v1/playerassets/{user_id}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url, headers=ROLIMONS_HEADERS, timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+                if data.get("success") is False:
+                    return None
+                assets = data.get("playerAssets") or data.get("assets") or {}
+                if isinstance(assets, dict):
+                    total = 0
+                    for asset_instances in assets.values():
+                        total += len(asset_instances) if isinstance(asset_instances, list) else 1
+                    return total
+                return None
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        logger.exception("เรียก Rolimon's playerassets ไม่สำเร็จ")
+        return None
+
+
+async def fetch_roblox_avatar(user_id: int) -> str | None:
+    """ดึง URL รูปตัวละคร Roblox (full-body render) ของผู้ใช้ สำหรับใช้เป็น thumbnail"""
+    url = (
+        "https://thumbnails.roblox.com/v1/users/avatar"
+        f"?userIds={user_id}&size=250x250&format=Png&isCircular=false"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+                results = data.get("data") or []
+                if results:
+                    return results[0].get("imageUrl")
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        return None
+    return None
+
+
+class RolimonsProfileView(discord.ui.View):
+    """ปุ่มลิงก์ไปหน้า Profile และ History บน Rolimon's (สไตล์เดียวกับการ์ด RoliBot)"""
+
+    def __init__(self, user_id: int):
+        super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="Profile",
+                emoji="👤",
+                style=discord.ButtonStyle.link,
+                url=f"https://www.rolimons.com/player/{user_id}",
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="History",
+                emoji="📜",
+                style=discord.ButtonStyle.link,
+                url=f"https://www.rolimons.com/player/{user_id}",
+            )
+        )
 
 
 # =========================================================
@@ -1809,6 +1956,76 @@ async def say(interaction: discord.Interaction, message: str):
     await interaction.channel.send(message)
 
 
+@bot.tree.command(name="user", description="ดูสถิติ Roblox/Rolimon's ของผู้ใช้ (RAP, Value, Collectibles, Value Rank)")
+@app_commands.describe(username="ชื่อผู้ใช้ Roblox หรือ User ID")
+async def user_lookup(interaction: discord.Interaction, username: str):
+    await interaction.response.defer()
+
+    roblox_user = await resolve_roblox_user(username)
+    if not roblox_user:
+        await interaction.followup.send(
+            embed=base_embed(
+                "ไม่พบผู้ใช้",
+                f"❌ ไม่พบผู้ใช้ Roblox ชื่อ **{username}** กรุณาตรวจสอบชื่อ/ID อีกครั้ง",
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            )
+        )
+        return
+
+    user_id = roblox_user["id"]
+    display_name = roblox_user["display_name"]
+    real_name = roblox_user["name"]
+
+    player_info, collectibles, avatar_url = await asyncio.gather(
+        fetch_rolimons_playerinfo(user_id),
+        fetch_rolimons_collectibles(user_id),
+        fetch_roblox_avatar(user_id),
+    )
+
+    if not player_info:
+        await interaction.followup.send(
+            embed=base_embed(
+                "ดึงข้อมูลไม่สำเร็จ",
+                (
+                    f"❌ ไม่สามารถดึงข้อมูลจาก Rolimon's สำหรับ **{display_name}** ได้ในตอนนี้\n"
+                    "สาเหตุที่เป็นไปได้: ผู้ใช้นี้ยังไม่เคยถูกเก็บสถิติใน Rolimon's หรือ API ถูกจำกัด/บล็อกการเข้าถึงชั่วคราว "
+                    "(Rolimon's เริ่มบล็อกการเรียก API นี้จากบางโฮสต์ตั้งแต่ต้นปี 2569)"
+                ),
+                color=Theme.WARNING,
+                guild=interaction.guild,
+            )
+        )
+        return
+
+    rap = player_info.get("rap", 0) or 0
+    value = player_info.get("value", 0) or 0
+    rank = player_info.get("rank")
+    rank_text = f"#{rank:,}" if rank else "ไม่มีข้อมูล"
+    collectibles_text = f"{collectibles:,}" if collectibles is not None else "ไม่มีข้อมูล"
+
+    embed = discord.Embed(color=Theme.ROLIMONS, timestamp=datetime.datetime.now(timezone.utc))
+    embed.set_author(
+        name="Rolimon's",
+        icon_url="https://www.rolimons.com/favicon.ico",
+        url=f"https://www.rolimons.com/player/{user_id}",
+    )
+    embed.title = "Roblox"
+    name_line = f"**{display_name}**"
+    if real_name != display_name:
+        name_line += f" (@{real_name})"
+    embed.description = name_line
+    embed.add_field(name="RAP", value=f"{rap:,}", inline=True)
+    embed.add_field(name="Value", value=f"{value:,}", inline=True)
+    embed.add_field(name="Collectibles", value=collectibles_text, inline=True)
+    embed.add_field(name="Value Rank", value=rank_text, inline=False)
+    embed.set_footer(text="Stats updated a few seconds ago, refresh stats by visiting the profile page")
+    if avatar_url:
+        embed.set_thumbnail(url=avatar_url)
+
+    await interaction.followup.send(embed=embed, view=RolimonsProfileView(user_id))
+
+
 @bot.tree.command(name="help", description="แสดงรายการคำสั่งทั้งหมด")
 async def help_command(interaction: discord.Interaction):
     embed = base_embed(
@@ -1832,6 +2049,11 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(
         name="💬 ทั่วไป",
         value="`/ping` `/userinfo` `/serverinfo` `/poll` `/say`",
+        inline=False
+    )
+    embed.add_field(
+        name="🟦 Roblox / Rolimon's",
+        value="`/user` — ดูสถิติ Roblox ของผู้ใช้ (RAP, Value, Collectibles, Value Rank)",
         inline=False
     )
     embed.add_field(
