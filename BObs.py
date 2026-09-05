@@ -206,6 +206,7 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+bot.startup_done = False  # ใช้กันไม่ให้ sync คำสั่ง/โหลด emoji ซ้ำทุกครั้งที่ reconnect (กัน global rate limit)
 
 # ---------- ระบบเก็บค่ายศยืนยันตัวตนต่อเซิร์ฟเวอร์ ----------
 VERIFY_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "verify_config.json")
@@ -818,8 +819,23 @@ async def load_custom_emojis():
 @bot.event
 async def on_ready():
     logger.info(f"เข้าสู่ระบบในชื่อ {bot.user} (ID: {bot.user.id})")
-    await load_custom_emojis()
 
+    # ทำงานหนัก (เรียก API จริง) แค่ครั้งเดียวต่อการรันโปรเซส กัน global rate limit
+    # ถ้า reconnect บ่อย ๆ (เช่น hosting ไม่เสถียร) จะไม่ยิง sync/emoji ซ้ำจนโดนบล็อก
+    if not bot.startup_done:
+        await load_custom_emojis()
+        try:
+            synced = await bot.tree.sync()
+            logger.info(f"ซิงค์ slash command แล้ว {len(synced)} คำสั่ง")
+        except discord.HTTPException:
+            logger.exception(
+                "ซิงค์คำสั่งไม่สำเร็จ (อาจโดน rate limit ชั่วคราว) — คำสั่งเก่ายังใช้งานได้ปกติ จะลองใหม่ตอนรีสตาร์ทครั้งหน้า"
+            )
+        except Exception:
+            logger.exception("เกิดข้อผิดพลาดตอนซิงค์คำสั่ง")
+        bot.startup_done = True
+
+    # ส่วนนี้เป็นแค่การลงทะเบียน view ใน local (ไม่เรียก API) ปลอดภัยที่จะทำซ้ำทุกครั้งที่ on_ready
     verify_view = VerifyView()
     ticket_open_view = TicketOpenView()
     ticket_close_view = TicketCloseView()
@@ -838,11 +854,6 @@ async def on_ready():
             bot.add_view(ScriptHubView(int(guild_id_str), conf.get("items", [])))
         except (ValueError, TypeError):
             logger.warning(f"ลงทะเบียนแผง scripthub ของ guild {guild_id_str} ไม่สำเร็จ")
-    try:
-        synced = await bot.tree.sync()
-        logger.info(f"ซิงค์ slash command แล้ว {len(synced)} คำสั่ง")
-    except Exception as e:
-        logger.exception(f"เกิดข้อผิดพลาดตอนซิงค์คำสั่ง: {e}")
 
     # เปิดสถานะอัตโนมัติทุกครั้งที่บอทออนไลน์ (กันกรณีรีสตาร์ทแล้วลืมสั่งใหม่)
     if not update_status.is_running():
