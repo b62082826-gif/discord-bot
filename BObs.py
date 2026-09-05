@@ -3,9 +3,12 @@ import json
 import logging
 import datetime
 import threading
+import asyncio
+from collections import deque
 from datetime import timezone, timedelta
 
 import discord
+import google.generativeai as genai
 from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -187,6 +190,17 @@ def start_keep_alive():
 # แก้ไขให้เหลือเฉพาะชื่อตัวแปรในวงเล็บ
 TOKEN = os.getenv("BOT_TOKEN")
 
+# ---------------------------------------------------------
+# ระบบ AI ตอบแชท (Google Gemini API)
+# ---------------------------------------------------------
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+AI_MODEL = os.getenv("AI_MODEL", "gemini-2.0-flash")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    logger.warning("ไม่พบ GEMINI_API_KEY — ระบบ AI ตอบแชทจะทำงานไม่ได้จนกว่าจะตั้งค่าใน .env")
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -294,6 +308,88 @@ def save_scripthub_config(config: dict) -> None:
 #                 "file_path": str|None, "file_name": str|None} ]
 # } }
 scripthub_config = load_scripthub_config()
+
+
+# ---------- ระบบเก็บค่า AI ตอบแชท ----------
+AI_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ai_config.json")
+
+
+def load_ai_config() -> dict:
+    if os.path.exists(AI_CONFIG_PATH):
+        try:
+            with open(AI_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            logger.warning("อ่านไฟล์ ai_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            return {}
+    return {}
+
+
+def save_ai_config(config: dict) -> None:
+    with open(AI_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+# โครงสร้าง: { "guild_id": {"enabled": bool, "channel_id": int|None, "persona": str|None} }
+ai_config = load_ai_config()
+
+DEFAULT_AI_PERSONA = (
+    "คุณคือ BOB_BOT ผู้ช่วย AI ประจำเซิร์ฟเวอร์ Discord พูดจาเป็นกันเอง สุภาพ กระชับ ไม่ยืดเยื้อ "
+    "ตอบเป็นภาษาไทยเป็นหลัก (ยกเว้นผู้ใช้พิมพ์ภาษาอื่นมาก็ตอบภาษานั้นได้) "
+    "ถ้าไม่แน่ใจให้บอกตามตรงว่าไม่แน่ใจ อย่าแต่งข้อมูลขึ้นมาเอง และหลีกเลี่ยงเนื้อหาที่ไม่เหมาะสม"
+)
+
+# เก็บบทสนทนาล่าสุดต่อห้อง (อยู่ในหน่วยความจำเท่านั้น หายเมื่อบอทรีสตาร์ท — ถือเป็นความจำระยะสั้นพอ)
+AI_HISTORY_LIMIT = 12  # เก็บแค่ 12 ข้อความล่าสุดต่อห้อง (รวม user+assistant) กัน context ยาวเกิน/ค่าใช้จ่ายสูง
+ai_conversations: dict[int, deque] = {}
+
+
+def get_ai_history(channel_id: int) -> deque:
+    if channel_id not in ai_conversations:
+        ai_conversations[channel_id] = deque(maxlen=AI_HISTORY_LIMIT)
+    return ai_conversations[channel_id]
+
+
+async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_message: str) -> str:
+    """เรียก Google Gemini API เพื่อสร้างคำตอบ โดยใช้ประวัติแชทสั้น ๆ ของห้องนั้นประกอบ context"""
+    if not GEMINI_API_KEY:
+        return "❌ ยังไม่ได้ตั้งค่า GEMINI_API_KEY บนเซิร์ฟเวอร์ที่รันบอท กรุณาแจ้งผู้ดูแลบอทให้ตั้งค่าใน .env"
+
+    history = get_ai_history(channel_id)
+    new_turn = {"role": "user", "parts": [f"{user_name}: {user_message}"]}
+    contents = list(history) + [new_turn]
+
+    def call_api():
+        model = genai.GenerativeModel(model_name=AI_MODEL, system_instruction=persona)
+        return model.generate_content(contents)
+
+    try:
+        response = await asyncio.to_thread(call_api)
+    except Exception:
+        logger.exception("เรียก Gemini API ไม่สำเร็จ")
+        return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้งภายหลัง"
+
+    reply_text = (getattr(response, "text", None) or "").strip()
+    if not reply_text:
+        reply_text = "🤔 ขอโทษด้วย ตอนนี้ตอบไม่ได้ ลองถามใหม่อีกครั้งนะ"
+
+    # เก็บทั้งคำถามและคำตอบไว้เป็น context สำหรับข้อความถัดไปในห้องเดียวกัน
+    # Gemini ใช้ role "model" แทน "assistant"
+    history.append(new_turn)
+    history.append({"role": "model", "parts": [reply_text]})
+    return reply_text
+
+
+def split_for_discord(text: str, limit: int = 1900) -> list:
+    """ตัดข้อความยาวให้พอดีกับลิมิต 2000 ตัวอักษรของ Discord ต่อหนึ่งข้อความ"""
+    if len(text) <= limit:
+        return [text]
+    chunks = []
+    remaining = text
+    while remaining:
+        chunks.append(remaining[:limit])
+        remaining = remaining[limit:]
+    return chunks
 
 
 def safe_filename_part(text: str, fallback: str = "item") -> str:
@@ -761,6 +857,52 @@ async def on_disconnect():
 @bot.event
 async def on_resumed():
     logger.info("เชื่อมต่อกับ Discord กลับมาได้แล้ว")
+
+
+@bot.event
+async def on_message(message: discord.Message):
+    # ยังคงให้ command แบบ prefix (ถ้ามีในอนาคต) ทำงานได้ตามปกติ
+    await bot.process_commands(message)
+
+    if message.author.bot or not message.guild:
+        return
+
+    guild_id = str(message.guild.id)
+    conf = ai_config.get(guild_id)
+    if not conf or not conf.get("enabled"):
+        return
+
+    bot_mentioned = bot.user in message.mentions
+    target_channel_id = conf.get("channel_id")
+    in_target_channel = target_channel_id is not None and message.channel.id == int(target_channel_id)
+
+    # ตอบเมื่อ: ถูกแท็ก @บอท ในห้องไหนก็ได้ของกิลด์นี้ หรืออยู่ในห้องที่ตั้งค่าไว้ให้ AI ตอบทุกข้อความ
+    if not bot_mentioned and not in_target_channel:
+        return
+
+    user_text = message.content
+    for mention in message.mentions:
+        user_text = user_text.replace(f"<@{mention.id}>", "").replace(f"<@!{mention.id}>", "")
+    user_text = user_text.strip()
+    if not user_text:
+        return
+
+    persona = conf.get("persona") or DEFAULT_AI_PERSONA
+
+    try:
+        async with message.channel.typing():
+            reply_text = await generate_ai_reply(
+                message.channel.id, persona, message.author.display_name, user_text
+            )
+    except discord.Forbidden:
+        return  # บอทไม่มีสิทธิ์พิมพ์/ส่งข้อความในห้องนี้
+
+    for chunk in split_for_discord(reply_text):
+        try:
+            await message.reply(chunk, mention_author=False)
+        except discord.HTTPException:
+            logger.exception("ส่งคำตอบ AI ไม่สำเร็จ")
+            break
 
 
 # =========================================================
@@ -1467,6 +1609,93 @@ async def scripthub_listitems(interaction: discord.Interaction):
 
 
 # =========================================================
+# หมวด: ระบบ AI ตอบแชท (Google Gemini)
+# =========================================================
+
+@bot.tree.command(name="ai_setup", description="ตั้งค่าระบบ AI ตอบแชทสำหรับเซิร์ฟเวอร์นี้")
+@app_commands.describe(
+    channel="ห้องที่ต้องการให้ AI ตอบทุกข้อความ (ไม่ใส่ = ตอบเฉพาะตอนถูกแท็ก @บอท เท่านั้น)",
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def ai_setup(interaction: discord.Interaction, channel: discord.TextChannel = None):
+    guild_id = str(interaction.guild.id)
+    conf = ai_config.get(guild_id, {"enabled": True, "channel_id": None, "persona": None})
+    conf["enabled"] = True
+    conf["channel_id"] = channel.id if channel else None
+    ai_config[guild_id] = conf
+    save_ai_config(ai_config)
+
+    where = channel.mention if channel else "การแท็ก @บอท ในห้องไหนก็ได้ของเซิร์ฟเวอร์นี้"
+    await interaction.response.send_message(
+        embed=base_embed(
+            "ตั้งค่า AI สำเร็จ ✅",
+            f"เปิดใช้งานระบบ AI ตอบแชทแล้ว\nขอบเขตการตอบ: {where}",
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="ai_toggle", description="เปิด/ปิดระบบ AI ตอบแชทสำหรับเซิร์ฟเวอร์นี้")
+@app_commands.describe(enabled="เปิด (True) หรือ ปิด (False)")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def ai_toggle(interaction: discord.Interaction, enabled: bool):
+    guild_id = str(interaction.guild.id)
+    conf = ai_config.get(guild_id, {"enabled": True, "channel_id": None, "persona": None})
+    conf["enabled"] = enabled
+    ai_config[guild_id] = conf
+    save_ai_config(ai_config)
+
+    status_text = "เปิดใช้งาน ✅" if enabled else "ปิดใช้งาน ⛔"
+    await interaction.response.send_message(
+        embed=base_embed(
+            "อัปเดตแล้ว",
+            f"ระบบ AI ตอบแชท: {status_text}",
+            color=Theme.SUCCESS if enabled else Theme.WARNING,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="ai_persona", description="ตั้งค่าบุคลิก/กติกาพื้นฐานของ AI (system prompt)")
+@app_commands.describe(persona="คำอธิบายบุคลิก/กติกาที่ต้องการให้ AI ยึดถือ")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def ai_persona(interaction: discord.Interaction, persona: str):
+    guild_id = str(interaction.guild.id)
+    conf = ai_config.get(guild_id, {"enabled": True, "channel_id": None, "persona": None})
+    conf["persona"] = persona
+    ai_config[guild_id] = conf
+    save_ai_config(ai_config)
+
+    await interaction.response.send_message(
+        embed=base_embed(
+            "ตั้งค่าบุคลิกสำเร็จ ✅",
+            "อัปเดต persona ของ AI แล้ว ข้อความถัดไปจะใช้กติกาใหม่นี้",
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="ai_reset", description="ล้างความจำการสนทนา AI ของห้องนี้")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def ai_reset(interaction: discord.Interaction):
+    ai_conversations.pop(interaction.channel.id, None)
+    await interaction.response.send_message(
+        embed=base_embed(
+            "ล้างความจำแล้ว ✅",
+            "AI จะเริ่มบทสนทนาใหม่ในห้องนี้ (ไม่มีประวัติเก่าติดมา)",
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+# =========================================================
 # หมวด: คำสั่งทั่วไป (General Commands)
 # =========================================================
 
@@ -1603,6 +1832,16 @@ async def help_command(interaction: discord.Interaction):
             "`/scripthub_additem` — เพิ่มรายการไฟล์/ข้อความเข้าแผง\n"
             "`/scripthub_removeitem` — ลบรายการออกจากแผง\n"
             "`/scripthub_listitems` — ดูรายการทั้งหมดในแผง"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🤖 AI ตอบแชท",
+        value=(
+            "`/ai_setup` — เปิดใช้งาน + เลือกห้องที่ให้ AI ตอบทุกข้อความ (ไม่เลือก = ตอบเมื่อถูกแท็ก)\n"
+            "`/ai_toggle` — เปิด/ปิดระบบ\n"
+            "`/ai_persona` — ตั้งค่าบุคลิก/กติกาของ AI\n"
+            "`/ai_reset` — ล้างความจำการสนทนาของห้องนี้"
         ),
         inline=False
     )
