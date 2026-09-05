@@ -371,11 +371,24 @@ async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_
             config=types.GenerateContentConfig(system_instruction=persona),
         )
 
-    try:
-        response = await asyncio.to_thread(call_api)
-    except Exception:
-        logger.exception("เรียก Gemini API ไม่สำเร็จ")
-        return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้งภายหลัง"
+    # เจอ error 503 (โมเดลฝั่ง Google โหลดสูงชั่วคราว) ให้ลองใหม่แบบเว้นช่วงเพิ่มขึ้นก่อนจะยอมแพ้
+    max_retries = 3
+    response = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = await asyncio.to_thread(call_api)
+            break
+        except genai_errors.ServerError:
+            if attempt == max_retries:
+                logger.warning(f"Gemini API โหลดสูงเกินไป (503) ลองซ้ำครบ {max_retries} ครั้งแล้วยังไม่สำเร็จ")
+                return "⏳ ตอนนี้ AI มีผู้ใช้งานเยอะจนโมเดลโหลดสูงชั่วคราว กรุณาลองใหม่อีกครั้งในอีกสักครู่"
+            wait_seconds = 2 * attempt  # 2s, 4s, ...
+            logger.warning(f"Gemini API ตอบ 503 (โหลดสูง) — รอ {wait_seconds}s แล้วลองใหม่ (ครั้งที่ {attempt}/{max_retries})")
+            await asyncio.sleep(wait_seconds)
+        except Exception as e:
+            logger.exception("เรียก Gemini API ไม่สำเร็จ")
+            # DEBUG ชั่วคราว: โชว์ error จริงออกมาด้วย เพื่อหาสาเหตุ — ลบทีหลังตอนแก้เสร็จ
+            return f"❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้\n```{repr(e)}```"
 
     reply_text = (getattr(response, "text", None) or "").strip()
     if not reply_text:
