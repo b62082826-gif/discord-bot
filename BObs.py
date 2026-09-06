@@ -9,9 +9,7 @@ from datetime import timezone, timedelta
 
 import aiohttp
 import discord
-from google import genai
-from google.genai import types
-from google.genai import errors as genai_errors
+from groq import Groq, RateLimitError, APIStatusError
 from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -195,16 +193,16 @@ def start_keep_alive():
 TOKEN = os.getenv("BOT_TOKEN")
 
 # ---------------------------------------------------------
-# ระบบ AI ตอบแชท (Google Gemini API)
+# ระบบ AI ตอบแชท (Groq API)
 # ---------------------------------------------------------
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-AI_MODEL = os.getenv("AI_MODEL", "gemini-3.6-flash")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-120b")
 
-genai_client = None
-if GEMINI_API_KEY:
-    genai_client = genai.Client(api_key=GEMINI_API_KEY)
+groq_client = None
+if GROQ_API_KEY:
+    groq_client = Groq(api_key=GROQ_API_KEY)
 else:
-    logger.warning("ไม่พบ GEMINI_API_KEY — ระบบ AI ตอบแชทจะทำงานไม่ได้จนกว่าจะตั้งค่าใน .env")
+    logger.warning("ไม่พบ GROQ_API_KEY — ระบบ AI ตอบแชทจะทำงานไม่ได้จนกว่าจะตั้งค่าใน .env")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -357,49 +355,50 @@ def get_ai_history(channel_id: int) -> deque:
 
 
 async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_message: str) -> str:
-    """เรียก Google Gemini API (SDK ใหม่ google-genai) เพื่อสร้างคำตอบ โดยใช้ประวัติแชทสั้น ๆ ของห้องนั้นประกอบ context"""
-    if not genai_client:
-        return "❌ ยังไม่ได้ตั้งค่า GEMINI_API_KEY บนเซิร์ฟเวอร์ที่รันบอท กรุณาแจ้งผู้ดูแลบอทให้ตั้งค่าใน .env"
+    """เรียก Groq API เพื่อสร้างคำตอบ โดยใช้ประวัติแชทสั้น ๆ ของห้องนั้นประกอบ context"""
+    if not groq_client:
+        return "❌ ยังไม่ได้ตั้งค่า GROQ_API_KEY บนเซิร์ฟเวอร์ที่รันบอท กรุณาแจ้งผู้ดูแลบอทให้ตั้งค่าใน .env"
 
     history = get_ai_history(channel_id)
-    # SDK ใหม่ต้องการให้แต่ละ part เป็น dict {"text": ...} แทนสตริงตรง ๆ แบบ SDK เก่า
-    new_turn = {"role": "user", "parts": [{"text": f"{user_name}: {user_message}"}]}
-    contents = list(history) + [new_turn]
+    # Groq ใช้รูปแบบ OpenAI-style: {"role": "user"/"assistant", "content": "..."}
+    new_turn = {"role": "user", "content": f"{user_name}: {user_message}"}
+    messages = [{"role": "system", "content": persona}] + list(history) + [new_turn]
 
     def call_api():
-        return genai_client.models.generate_content(
+        return groq_client.chat.completions.create(
             model=AI_MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(system_instruction=persona),
+            messages=messages,
         )
 
-    # เจอ error 503 (โมเดลฝั่ง Google โหลดสูงชั่วคราว) ให้ลองใหม่แบบเว้นช่วงเพิ่มขึ้นก่อนจะยอมแพ้
+    # เจอ error rate limit ให้ลองใหม่แบบเว้นช่วงเพิ่มขึ้นก่อนจะยอมแพ้
     max_retries = 3
     response = None
     for attempt in range(1, max_retries + 1):
         try:
             response = await asyncio.to_thread(call_api)
             break
-        except genai_errors.ServerError:
+        except RateLimitError as e:
             if attempt == max_retries:
-                logger.warning(f"Gemini API โหลดสูงเกินไป (503) ลองซ้ำครบ {max_retries} ครั้งแล้วยังไม่สำเร็จ")
-                return "⏳ ตอนนี้ AI มีผู้ใช้งานเยอะจนโมเดลโหลดสูงชั่วคราว กรุณาลองใหม่อีกครั้งในอีกสักครู่"
+                logger.warning(f"Groq API โควตาหมด/rate limit ลองซ้ำครบ {max_retries} ครั้งแล้วยังไม่สำเร็จ: {e}")
+                return "⏳ ตอนนี้ AI ถูกใช้งานเยอะเกินลิมิตชั่วคราว กรุณาลองใหม่อีกสักครู่"
             wait_seconds = 2 * attempt  # 2s, 4s, ...
-            logger.warning(f"Gemini API ตอบ 503 (โหลดสูง) — รอ {wait_seconds}s แล้วลองใหม่ (ครั้งที่ {attempt}/{max_retries})")
+            logger.warning(f"Groq API rate limit — รอ {wait_seconds}s แล้วลองใหม่ (ครั้งที่ {attempt}/{max_retries})")
             await asyncio.sleep(wait_seconds)
-        except Exception as e:
-            logger.exception("เรียก Gemini API ไม่สำเร็จ")
-            # DEBUG ชั่วคราว: โชว์ error จริงออกมาด้วย เพื่อหาสาเหตุ — ลบทีหลังตอนแก้เสร็จ
-            return f"❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้\n```{repr(e)}```"
+        except APIStatusError as e:
+            # error ฝั่ง Groq (เช่น model ไม่ถูกต้อง, auth ผิด ฯลฯ) — ไม่โชว์ raw error ให้ user เห็น
+            logger.exception(f"Groq API ตอบ error: {e}")
+            return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้ง"
+        except Exception:
+            logger.exception("เรียก Groq API ไม่สำเร็จ (unexpected)")
+            return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้ง"
 
-    reply_text = (getattr(response, "text", None) or "").strip()
+    reply_text = (response.choices[0].message.content or "").strip() if response else ""
     if not reply_text:
         reply_text = "🤔 ขอโทษด้วย ตอนนี้ตอบไม่ได้ ลองถามใหม่อีกครั้งนะ"
 
-    # เก็บทั้งคำถามและคำตอบไว้เป็น context สำหรับข้อความถัดไปในห้องเดียวกัน
-    # Gemini ใช้ role "model" แทน "assistant"
+    # เก็บทั้งคำถามและคำตอบไว้เป็น context สำหรับข้อความถัดไปในห้องเดียวกัน (รูปแบบ OpenAI-style: role "assistant")
     history.append(new_turn)
-    history.append({"role": "model", "parts": [{"text": reply_text}]})
+    history.append({"role": "assistant", "content": reply_text})
     return reply_text
 
 
@@ -1787,7 +1786,7 @@ async def scripthub_listitems(interaction: discord.Interaction):
 
 
 # =========================================================
-# หมวด: ระบบ AI ตอบแชท (Google Gemini)
+# หมวด: ระบบ AI ตอบแชท (Groq)
 # =========================================================
 
 @bot.tree.command(name="ai_setup", description="ตั้งค่าระบบ AI ตอบแชทสำหรับเซิร์ฟเวอร์นี้")
