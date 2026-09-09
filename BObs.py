@@ -15,10 +15,10 @@ from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from flask import Flask
 
-load_dotenv()  # โหลดค่าจากไฟล์ .env เข้าสู่ environment variables
+load_dotenv()  # Load values from .env into environment variables
 
 # ---------------------------------------------------------
-# Logging: สำคัญมากเวลารันแบบ 24/7 เพื่อดูว่าบอทหลุด/error ตรงไหน
+# Logging: important for 24/7 runs to see where the bot fails
 # ---------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
@@ -31,33 +31,42 @@ logging.basicConfig(
 logger = logging.getLogger("bobbot")
 
 # ---------------------------------------------------------
-# ธีมสี/สไตล์กลาง — ใช้ให้ทุก Embed ในบอทหน้าตาไปทิศทางเดียวกัน
+# Theme colors — keeps every embed in the bot visually consistent
 # ---------------------------------------------------------
 class Theme:
-    PRIMARY = discord.Color.from_rgb(114, 137, 218)     # ม่วง-ฟ้า (โทนหลักของบอท)
-    SUCCESS = discord.Color.from_rgb(87, 242, 135)       # เขียวมิ้นต์
-    DANGER = discord.Color.from_rgb(237, 66, 69)         # แดง
-    WARNING = discord.Color.from_rgb(255, 186, 73)       # ส้ม/เหลือง
-    INFO = discord.Color.from_rgb(88, 164, 255)          # ฟ้าสด
-    TICKET = discord.Color.from_rgb(59, 165, 93)         # เขียวเข้ม
-    SCRIPTHUB = discord.Color.from_rgb(153, 69, 255)     # ม่วงสด
-    ROLIMONS = discord.Color.from_rgb(66, 135, 245)      # ฟ้า Rolimon's
+    PRIMARY = discord.Color.from_rgb(114, 137, 218)
+    SUCCESS = discord.Color.from_rgb(87, 242, 135)
+    DANGER = discord.Color.from_rgb(237, 66, 69)
+    WARNING = discord.Color.from_rgb(255, 186, 73)
+    INFO = discord.Color.from_rgb(88, 164, 255)
+    TICKET = discord.Color.from_rgb(59, 165, 93)
+    SCRIPTHUB = discord.Color.from_rgb(153, 69, 255)
+    ROLIMONS = discord.Color.from_rgb(66, 135, 245)
 
     DIVIDER = "─────────────────────"
 
+    # Rotating accent colors used for Rules language sections when no
+    # custom color is given (first one matches the red bar in the example,
+    # second matches the blue bar, etc.)
+    RULES_PALETTE = [
+        discord.Color.from_rgb(230, 60, 60),
+        discord.Color.from_rgb(60, 110, 230),
+        discord.Color.from_rgb(60, 200, 120),
+        discord.Color.from_rgb(230, 170, 60),
+        discord.Color.from_rgb(170, 90, 230),
+        discord.Color.from_rgb(60, 200, 200),
+    ]
+
 
 # ---------------------------------------------------------
-# Custom Emoji ของบอท (Application Emojis)
-# — emoji พวกนี้ผูกกับตัวบอทเอง ใช้ได้ทุกเซิร์ฟเวอร์โดยไม่ต้องมีบอทอยู่ในเซิร์ฟที่อัปโหลดไว้
-# โหลดเข้า cache ตอน on_ready แล้วเรียกใช้ผ่านฟังก์ชัน E(key, fallback)
+# Custom Emoji (Application Emojis)
 # ---------------------------------------------------------
 CUSTOM_EMOJI_NAMES = {
-    # ระบบ/สถานะ (ปรับตามหน้าตาจริงที่เห็นในรูป)
-    "success": "spbluetick",          # ✅ เครื่องหมายถูกวงกลม เหมาะกับ "สำเร็จ" ที่สุด
-    "check": "bluecheckmark",         # เครื่องหมายถูกเฉย ๆ (ใช้แทน success ได้เหมือนกัน)
-    "verified": "verifiedids",        # โล่เขียว+ถูก
-    "not_verified": "nonverifiedids", # โล่เทา (ยังไม่ยืนยัน/ปฏิเสธ)
-    "certified": "certified",         # วงกลมเขียว+ถูก
+    "success": "spbluetick",
+    "check": "bluecheckmark",
+    "verified": "verifiedids",
+    "not_verified": "nonverifiedids",
+    "certified": "certified",
     "info": "info",
     "lock": "lock",
     "star": "starids",
@@ -68,10 +77,10 @@ CUSTOM_EMOJI_NAMES = {
     "heart_outline": "bluedrawingheart",
     "arrow": "darkbluearrow",
     "staff": "bluestaffbadge",
-    "moderator": "moderator",         # โล่ม่วง — ใช้กับข้อความ mod โดยเฉพาะ
+    "moderator": "moderator",
     "blue_moderator": "bluemoderator",
     "mod_shield": "modshieldicon",
-    "ticket": "ticketicon",           # หน้าตาเหมือนตั๋ว/เพชร ใช้กับระบบทิกเก็ตตรง ๆ
+    "ticket": "ticketicon",
     "shield": "shield",
     "link": "link",
     "web": "webicon",
@@ -83,8 +92,8 @@ CUSTOM_EMOJI_NAMES = {
     "planet": "blueplanet",
     "lines": "lines",
     "gift": "giftingpatron",
+    "language": "blueplanet",
 
-    # Emoji มุก (Pepe/Joobi) — ใช้แต่งข้อความทั่วไปที่ไม่ใช่การลงโทษ/ระบบจริงจัง
     "fun_clap": "pepeclap",
     "fun_love": "pepeheart",
     "fun_nervous": "pepenervous",
@@ -104,12 +113,10 @@ CUSTOM_EMOJI_NAMES = {
     "fun_crewmate": "bluecrewmate",
 }
 
-# เก็บ Emoji object ของแอปบอทหลังโหลดจาก Discord (ตอน on_ready)
 custom_emoji_cache: dict[str, "discord.Emoji"] = {}
 
 
 def E(key: str, fallback: str = "❓") -> str:
-    """คืนค่า custom emoji ของบอทตาม key ความหมาย ถ้าไม่พบ/ยังไม่โหลด จะคืน unicode fallback แทน (ไม่มีวันพัง)"""
     emoji_name = CUSTOM_EMOJI_NAMES.get(key)
     if emoji_name:
         emoji = custom_emoji_cache.get(emoji_name)
@@ -118,7 +125,6 @@ def E(key: str, fallback: str = "❓") -> str:
     return fallback
 
 
-# glyph ยูนิโค้ดที่ใช้ในข้อความ -> key ความหมายที่จะแปลงเป็น custom emoji อัตโนมัติ
 _UNICODE_TO_EMOJI_KEY = {
     "✅": "success",
     "⭐": "star",
@@ -133,7 +139,6 @@ _UNICODE_TO_EMOJI_KEY = {
 
 
 def themify(text: str) -> str:
-    """แทนที่ unicode emoji ในข้อความด้วย custom emoji ของบอท (ถ้ามี) โดยอัตโนมัติ"""
     if not text:
         return text
     for glyph, key in _UNICODE_TO_EMOJI_KEY.items():
@@ -149,7 +154,6 @@ def base_embed(
     guild: discord.Guild = None,
     timestamp: bool = True,
 ) -> discord.Embed:
-    """สร้าง Embed พื้นฐานที่มีสไตล์เดียวกันทั้งบอท (สี/footer/timestamp)"""
     embed = discord.Embed(
         title=themify(title),
         description=themify(description),
@@ -162,11 +166,625 @@ def base_embed(
     return embed
 
 
+# =========================================================
+# i18n system — per-guild language, default English
+# =========================================================
+LANGUAGE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "language_config.json")
+DEFAULT_LANGUAGE = "en"
+
+# Add more languages here any time — just add a new top-level key to
+# TRANSLATIONS with the same set of keys, and register it below.
+AVAILABLE_LANGUAGES = {
+    "en": {"name": "English", "flag": "🇬🇧"},
+    "th": {"name": "ไทย", "flag": "🇹🇭"},
+}
+
+
+def load_language_config() -> dict:
+    if os.path.exists(LANGUAGE_CONFIG_PATH):
+        try:
+            with open(LANGUAGE_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Could not read language_config.json — starting empty")
+            return {}
+    return {}
+
+
+def save_language_config(config: dict) -> None:
+    with open(LANGUAGE_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+# Structure: { "guild_id": "en" | "th" | ... }
+language_config = load_language_config()
+
+
+def get_guild_language(guild_id) -> str:
+    return language_config.get(str(guild_id), DEFAULT_LANGUAGE)
+
+
+def set_guild_language(guild_id, lang_code: str) -> None:
+    language_config[str(guild_id)] = lang_code
+    save_language_config(language_config)
+
+
+TRANSLATIONS = {
+    "en": {
+        # verify
+        "verify_not_configured_title": "Not configured yet",
+        "verify_not_configured_desc": "❌ This server hasn't set up a verification role yet.\nAsk an admin to run `/setupverify`.",
+        "verify_role_missing_title": "Role not found",
+        "verify_role_missing_desc": "❌ The configured role couldn't be found (it may have been deleted). Please contact an admin.",
+        "verify_already_title": "Already verified",
+        "verify_already_desc": "✅ You're already verified.",
+        "verify_success_title": "Verification successful 🎉",
+        "verify_success_desc": "You've been given the {role} role. Welcome!",
+        "verify_no_permission_title": "Something went wrong",
+        "verify_no_permission_desc": "❌ The bot doesn't have permission to grant this role (make sure the bot's role is above the target role).",
+        "verify_role_too_high_title": "Role too high",
+        "verify_role_too_high_desc": "❌ The selected role is higher than or equal to the bot's role. Please move the bot's role above it first.",
+        "verify_panel_title": "⭐ Verify to access this server",
+        "verify_panel_desc": "Click the **Verify** button below to receive the {role} role.\n{divider}\nVerifying unlocks channels across the server for you ✅",
+        "verify_setup_success_title": "Setup successful ✅",
+        "verify_setup_sending": "Sending the verification message...",
+        "verify_button_label": "Verify",
+
+        # ticket
+        "ticket_not_configured_title": "Not configured yet",
+        "ticket_not_configured_desc": "❌ The ticket system isn't set up. Ask an admin to run `/setupticket`.",
+        "ticket_category_missing_title": "Category not found",
+        "ticket_category_missing_desc": "❌ The configured category couldn't be found (it may have been deleted). Please contact an admin.",
+        "ticket_already_open_title": "You already have a ticket",
+        "ticket_already_open_desc": "❌ You already have an open ticket at {channel}",
+        "ticket_create_forbidden_title": "Something went wrong",
+        "ticket_create_forbidden_desc": "❌ The bot doesn't have permission to create channels in this category. Please check the bot's permissions.",
+        "ticket_create_failed_title": "Something went wrong",
+        "ticket_create_failed_desc": "❌ Couldn't create the ticket channel. Please try again.",
+        "ticket_channel_title": "🎫 Your ticket",
+        "ticket_channel_desc": "Hi {member}, our team will be with you shortly.\n{divider}\nPlease describe your issue or request below and we'll get back to you as soon as we can 💬",
+        "ticket_support_team_field": "👥 Support team",
+        "ticket_opened_by_field": "👤 Opened by",
+        "ticket_created_title": "Ticket created ✅",
+        "ticket_created_desc": "Your ticket has been created at {channel}",
+        "ticket_no_permission_title": "No permission",
+        "ticket_no_permission_desc": "❌ You don't have permission to close this ticket",
+        "ticket_closing_title": "🔒 Closing ticket",
+        "ticket_closing_desc": "This channel will be deleted in 5 seconds by {member}, see you around {wave}",
+        "ticket_closing_desc_simple": "This channel will be deleted in 5 seconds by {member}",
+        "ticket_not_a_ticket_title": "Not a ticket channel",
+        "ticket_not_a_ticket_desc": "❌ This isn't a ticket channel",
+        "ticket_panel_title": "🎫 Contact support",
+        "ticket_panel_desc": "Click the button below to open a private ticket with our team\n{divider}\nOur team will assist you as soon as possible 💬",
+        "ticket_setup_success_title": "Setup successful ✅",
+        "ticket_setup_sending": "Sending the ticket message...",
+        "ticket_open_button": "Open ticket",
+        "ticket_close_button": "Close ticket",
+
+        # scripthub
+        "scripthub_empty_title": "Nothing here yet",
+        "scripthub_empty_desc": "❌ No items are available yet. Ask an admin to add one with `/scripthub_additem`.",
+        "scripthub_item_missing_title": "Item not found",
+        "scripthub_item_missing_desc": "❌ This item no longer exists (it may have been removed). Try pressing Refresh Menu and try again.",
+        "scripthub_dm_default_content": "Here's your **{label}**",
+        "scripthub_sent_title": "Sent ✅",
+        "scripthub_sent_desc": "**{label}** has been sent to your DMs — check your inbox 📬 {clap}",
+        "scripthub_dm_forbidden_title": "Couldn't send DM",
+        "scripthub_dm_forbidden_desc": "❌ Please enable direct messages from members of this server first (check your Privacy Settings).",
+        "scripthub_send_error_title": "Something went wrong",
+        "scripthub_send_error_desc": "❌ An error occurred while sending the file. Please try again.",
+        "scripthub_select_placeholder": "✨ Select a script/file you want...",
+        "scripthub_no_items_option": "No items yet",
+        "scripthub_refresh_button": "Refresh Menu",
+        "scripthub_default_title": "SCRIPT HUB PANEL",
+        "scripthub_default_desc": "Pick a script from the menu below and the bot will send it to your DMs instantly",
+        "scripthub_how_to_use": "📥 **How to use:** click the ▾ menu, choose an item, and check your DMs",
+        "scripthub_items_ready_footer": "{count} item(s) available",
+        "scripthub_missing_data_title": "Missing information",
+        "scripthub_missing_data_desc": "❌ Please provide at least one: a message (content) or a file attachment",
+        "scripthub_not_setup_title": "Panel not created yet",
+        "scripthub_not_setup_desc": "❌ This server doesn't have a panel yet. Please run `/scripthub_setup` first.",
+        "scripthub_duplicate_title": "Name already used",
+        "scripthub_duplicate_desc": "❌ An item with this name already exists. Please choose a different name.",
+        "scripthub_full_title": "Panel is full",
+        "scripthub_full_desc": "❌ This panel already has 25 items (Discord's limit).",
+        "scripthub_creating_title": "Creating panel ✅",
+        "scripthub_creating_desc": "Creating the file-sharing panel...",
+        "scripthub_setup_done": "✅ Panel created. Use /scripthub_additem to keep adding items",
+        "scripthub_item_added_title": "Item added ✅",
+        "scripthub_item_added_desc": "Added **{label}** {note}",
+        "scripthub_note_updated": "and the live panel has been updated",
+        "scripthub_note_not_found": "(couldn't find the live panel — try pressing Refresh Menu on it)",
+        "scripthub_no_items_title": "No items",
+        "scripthub_no_items_desc": "❌ This panel doesn't have any items yet",
+        "scripthub_item_not_found_title": "Item not found",
+        "scripthub_item_not_found_desc": "❌ This item wasn't found",
+        "scripthub_removed_title": "Item removed ✅",
+        "scripthub_removed_desc": "Removed **{label}** {note}",
+        "scripthub_note_removed_updated": "and the live panel has been updated",
+        "scripthub_note_removed_not_found": "(try pressing Refresh Menu on the panel)",
+        "scripthub_empty_list_title": "Empty",
+        "scripthub_empty_list_desc": "📭 There are no items in this panel yet",
+        "scripthub_list_title": "📋 Items in the file/template panel",
+        "scripthub_kind_file": "📎 File",
+        "scripthub_kind_text": "💬 Text",
+
+        # AI system
+        "ai_no_key_configured": "❌ GROQ_API_KEY hasn't been set on the server running this bot. Please ask the bot admin to set it in .env",
+        "ai_rate_limited": "⏳ The AI is receiving too many requests right now. Please try again in a moment",
+        "ai_generic_error": "❌ Couldn't reach the AI right now. Please try again",
+        "ai_empty_reply": "🤔 Sorry, I couldn't come up with a reply. Try asking again",
+        "ai_setup_success_title": "AI setup successful ✅",
+        "ai_setup_success_desc": "The AI chat system is now enabled\nScope: {where}",
+        "ai_setup_where_channel": "{channel}",
+        "ai_setup_where_mention": "when mentioned (@bot) in any channel on this server",
+        "ai_toggle_updated_title": "Updated",
+        "ai_toggle_updated_desc": "AI chat system: {status}",
+        "ai_toggle_on": "Enabled ✅",
+        "ai_toggle_off": "Disabled ⛔",
+        "ai_persona_success_title": "Persona updated ✅",
+        "ai_persona_success_desc": "The AI's persona has been updated. The next message will use the new behavior",
+        "ai_reset_success_title": "Memory cleared ✅",
+        "ai_reset_success_desc": "The AI will start a fresh conversation in this channel (no old history carried over)",
+        "ai_default_persona": (
+            "You are BOB_BOT, an AI assistant for a Discord server. Speak casually, politely, "
+            "and concisely — don't ramble. Reply in the same language the user writes in "
+            "(default to English if unclear). If you're not sure about something, say so honestly "
+            "instead of making things up, and avoid inappropriate content."
+        ),
+
+        # settings / language
+        "settings_title": "⚙️ Server settings",
+        "settings_desc": "Pick the language the bot should use for its messages in this server.\nCurrent language: **{current}**",
+        "settings_select_placeholder": "🌐 Choose a language...",
+        "settings_updated_title": "Language updated ✅",
+        "settings_updated_desc": "The bot will now reply in **{language}** on this server.",
+        "settings_no_permission_title": "No permission",
+        "settings_no_permission_desc": "❌ You need the Manage Server permission to change this.",
+
+        # rules
+        "rules_setup_success_title": "Setup successful ✅",
+        "rules_setup_sending": "Sending the rules panel...",
+        "rules_setup_empty_note": "No languages added yet — use `/rules_addsection` to add your first one.",
+        "rules_placeholder_title": "📜 Server Rules",
+        "rules_placeholder_desc": "No rules have been added yet. An admin can add sections with `/rules_addsection`.",
+        "rules_not_setup_title": "Rules panel not created yet",
+        "rules_not_setup_desc": "❌ Please run `/rules_setup` first.",
+        "rules_section_added_title": "Section added ✅",
+        "rules_section_added_desc": "Added the **{name}** ({code}) rules section {note}",
+        "rules_section_updated_desc": "Updated the **{name}** ({code}) rules section {note}",
+        "rules_note_live_updated": "and updated the live panel",
+        "rules_note_live_missing": "(couldn't find the live panel — run `/rules_setup` again if needed)",
+        "rules_section_removed_title": "Section removed ✅",
+        "rules_section_removed_desc": "Removed the **{code}** rules section {note}",
+        "rules_section_not_found_title": "Section not found",
+        "rules_section_not_found_desc": "❌ No rules section with the code **{code}** was found",
+        "rules_no_sections_title": "No sections yet",
+        "rules_no_sections_desc": "📭 There are no rules sections yet. Use `/rules_addsection` to add one.",
+        "rules_list_title": "📋 Rules sections in this server",
+        "rules_too_many_title": "Too many sections",
+        "rules_too_many_desc": "❌ A single message can only hold up to 10 embeds, and this panel already has {count}.",
+
+        # moderation & general (used across commands)
+        "clear_success_title": "Messages cleared 🧹",
+        "clear_success_desc": "Deleted **{count}** message(s), nice and tidy {clap}",
+        "warn_title": "⚠️ Warning",
+        "warn_desc": "{member} was warned by {mod}",
+        "warn_reason_field": "📄 Reason",
+        "warn_dm_title": "You've been warned ⚠️",
+        "warn_dm_desc": "You were warned in **{guild}**",
+        "kick_no_permission_title": "No permission",
+        "kick_no_permission_desc": "❌ The bot doesn't have permission to kick this member (check the bot's role position)",
+        "kick_success_title": "👢 Member kicked",
+        "kick_success_desc": "{member} was kicked from the server",
+        "ban_no_permission_title": "No permission",
+        "ban_no_permission_desc": "❌ The bot doesn't have permission to ban this member (check the bot's role position)",
+        "ban_success_title": "🔨 Member banned",
+        "ban_success_desc": "{member} was banned from the server",
+        "timeout_no_permission_title": "No permission",
+        "timeout_no_permission_desc": "❌ The bot doesn't have permission to time out this member (check the bot's role position)",
+        "timeout_success_title": "🔇 Member timed out",
+        "timeout_success_desc": "{member} has been timed out for **{minutes} minute(s)**",
+        "reason_not_specified": "No reason given",
+        "addrole_success_title": "Role added ✅",
+        "addrole_success_desc": "Added {role} to {member} {thumbsup}",
+        "removerole_success_title": "Role removed ➖",
+        "removerole_success_desc": "Removed {role} from {member} {ohno}",
+        "nick_success_title": "Nickname changed ✏️",
+        "nick_success_desc": "{member}'s nickname is now **{nick}** {laughter}",
+
+        # role menu
+        "rolemenu_created_sending": "Creating the role menu...",
+        "rolemenu_created_note": "✅ Menu created. Use `/rolemenu_add message_id:{id}` to add role options",
+        "rolemenu_role_too_high_title": "Role too high",
+        "rolemenu_role_too_high_desc": "❌ The selected role is higher than or equal to the bot's role. Please move the bot's role above it first.",
+        "rolemenu_not_found_title": "Menu not found",
+        "rolemenu_not_found_desc": "❌ This menu wasn't found. Please create one with `/rolemenu_create` first.",
+        "rolemenu_message_not_found_title": "Message not found",
+        "rolemenu_message_not_found_desc": "❌ This message wasn't found in this channel. Please use the command in the same channel where the menu was created.",
+        "rolemenu_bad_emoji_title": "Invalid emoji",
+        "rolemenu_bad_emoji_desc": "❌ That emoji is invalid, or the bot can't use it",
+        "rolemenu_option_added_title": "Option added ✅",
+        "rolemenu_option_added_desc": "Added {emoji} → {role} to the menu",
+        "rolemenu_option_not_found_title": "Option not found",
+        "rolemenu_option_not_found_desc": "❌ This option wasn't found in the menu",
+        "rolemenu_option_removed_title": "Option removed ✅",
+        "rolemenu_option_removed_desc": "Removed {emoji} from the menu",
+        "rolemenu_role_deleted": "(role deleted)",
+
+        # general commands
+        "ping_pong_title": "🏓 Pong!",
+        "ping_pong_desc": "Current bot latency is **{ms}ms** {mood}",
+        "userinfo_title": "👤 {member}'s info",
+        "userinfo_username_field": "🏷️ Username",
+        "userinfo_id_field": "🆔 ID",
+        "userinfo_joined_field": "📥 Joined server on",
+        "userinfo_created_field": "🎂 Account created on",
+        "userinfo_roles_field": "🎭 Roles ({count})",
+        "userinfo_no_roles": "None",
+        "serverinfo_owner_field": "👑 Owner",
+        "serverinfo_members_field": "👥 Members",
+        "serverinfo_boosts_field": "🚀 Boosts",
+        "serverinfo_created_field": "📅 Created on",
+        "serverinfo_channels_field": "💬 Channels",
+        "serverinfo_roles_field": "🎭 Roles",
+        "poll_title": "📊 New poll",
+        "poll_desc": "**{question}**\n{divider}\nReact below to vote {gamer}",
+        "say_sent_title": "Message sent ✅",
+        "say_sent_desc": "Your message was sent {wink}",
+        "user_lookup_not_found_title": "User not found",
+        "user_lookup_not_found_desc": "❌ No Roblox user named **{username}** was found. Please check the name/ID and try again.",
+        "user_lookup_failed_title": "Couldn't fetch data",
+        "user_lookup_failed_desc": (
+            "❌ Couldn't fetch data from Rolimon's for **{name}** right now\n"
+            "Possible reasons: this user has never been tracked by Rolimon's, or the API is temporarily "
+            "rate-limited/blocked for some hosts (Rolimon's began blocking this API from some hosts in early 2026)"
+        ),
+        "user_lookup_no_data": "No data",
+        "user_lookup_footer": "Stats updated a few seconds ago, refresh stats by visiting the profile page",
+
+        # help
+        "help_title": "📖 All BOB_BOT commands",
+        "help_desc": "All commands available on this server",
+        "help_moderation": "🛡️ Moderation",
+        "help_roles": "🎭 Role management",
+        "help_general": "💬 General",
+        "help_roblox": "🟦 Roblox / Rolimon's",
+        "help_roblox_desc": "`/user` — view a user's Roblox stats (RAP, Value, Collectibles, Value Rank)",
+        "help_verify": "⭐ Verification",
+        "help_verify_desc": "`/setupverify` — set up + send the verification message (button gives a role)",
+        "help_rolemenu": "🎭 Reaction role menu",
+        "help_ticket": "🎫 Ticket system",
+        "help_scripthub": "📂 File/template panel (Script Hub)",
+        "help_ai": "🤖 AI chat",
+        "help_rules": "📜 Server rules",
+        "help_settings": "⚙️ Settings",
+        "help_settings_desc": "`/settings` — choose the language the bot replies in on this server",
+
+        # errors
+        "error_no_permission": "❌ You don't have permission to use this command",
+        "error_generic_title": "Something went wrong",
+        "error_generic_desc": "❌ An error occurred while running this command. Please try again",
+    },
+    "th": {
+        "verify_not_configured_title": "ยังไม่ได้ตั้งค่า",
+        "verify_not_configured_desc": "❌ ยังไม่ได้ตั้งค่ายศยืนยันตัวตนสำหรับเซิร์ฟเวอร์นี้\nกรุณาแจ้งแอดมินให้ใช้คำสั่ง `/setupverify`",
+        "verify_role_missing_title": "ไม่พบยศ",
+        "verify_role_missing_desc": "❌ ไม่พบยศที่ตั้งค่าไว้ (อาจถูกลบไปแล้ว) กรุณาแจ้งแอดมิน",
+        "verify_already_title": "ยืนยันแล้ว",
+        "verify_already_desc": "✅ คุณยืนยันตัวตนไปแล้ว",
+        "verify_success_title": "ยืนยันตัวตนสำเร็จ 🎉",
+        "verify_success_desc": "คุณได้รับยศ {role} เรียบร้อยแล้ว ยินดีต้อนรับ!",
+        "verify_no_permission_title": "ผิดพลาด",
+        "verify_no_permission_desc": "❌ บอทไม่มีสิทธิ์มอบยศนี้ (ตรวจสอบว่ายศของบอทอยู่สูงกว่ายศที่ต้องการมอบ)",
+        "verify_role_too_high_title": "ยศสูงเกินไป",
+        "verify_role_too_high_desc": "❌ ยศที่เลือกอยู่สูงกว่าหรือเท่ากับยศของบอท กรุณาเลื่อนยศบอทให้สูงกว่ายศนี้ก่อน",
+        "verify_panel_title": "⭐ ยืนยันตัวตนเพื่อเข้าใช้งานเซิร์ฟเวอร์",
+        "verify_panel_desc": "คลิกปุ่ม **ยืนยันตัวตน** ด้านล่างเพื่อรับยศ {role}\n{divider}\nการยืนยันตัวตนจะช่วยปลดล็อกห้องต่าง ๆ ภายในเซิร์ฟเวอร์ให้คุณ ✅",
+        "verify_setup_success_title": "ตั้งค่าสำเร็จ ✅",
+        "verify_setup_sending": "กำลังส่งข้อความยืนยันตัวตน...",
+        "verify_button_label": "ยืนยันตัวตน",
+
+        "ticket_not_configured_title": "ยังไม่ได้ตั้งค่า",
+        "ticket_not_configured_desc": "❌ ยังไม่ได้ตั้งค่าระบบทิกเก็ต กรุณาแจ้งแอดมินให้ใช้คำสั่ง `/setupticket`",
+        "ticket_category_missing_title": "ไม่พบหมวดหมู่",
+        "ticket_category_missing_desc": "❌ ไม่พบหมวดหมู่ที่ตั้งค่าไว้ (อาจถูกลบไปแล้ว) กรุณาแจ้งแอดมิน",
+        "ticket_already_open_title": "มีทิกเก็ตอยู่แล้ว",
+        "ticket_already_open_desc": "❌ คุณมีทิกเก็ตที่เปิดอยู่แล้วที่ {channel}",
+        "ticket_create_forbidden_title": "ผิดพลาด",
+        "ticket_create_forbidden_desc": "❌ บอทไม่มีสิทธิ์สร้างห้องในหมวดหมู่นี้ กรุณาตรวจสอบสิทธิ์ของบอท",
+        "ticket_create_failed_title": "ผิดพลาด",
+        "ticket_create_failed_desc": "❌ สร้างห้องทิกเก็ตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+        "ticket_channel_title": "🎫 ทิกเก็ตของคุณ",
+        "ticket_channel_desc": "สวัสดี {member} ทีมงานจะเข้ามาช่วยเหลือคุณเร็ว ๆ นี้\n{divider}\nกรุณาอธิบายปัญหาหรือคำขอของคุณด้านล่าง ทีมงานจะรีบตอบกลับโดยเร็วที่สุด 💬",
+        "ticket_support_team_field": "👥 ทีมงานที่ดูแล",
+        "ticket_opened_by_field": "👤 เปิดโดย",
+        "ticket_created_title": "เปิดทิกเก็ตสำเร็จ ✅",
+        "ticket_created_desc": "เปิดทิกเก็ตแล้วที่ {channel}",
+        "ticket_no_permission_title": "ไม่มีสิทธิ์",
+        "ticket_no_permission_desc": "❌ คุณไม่มีสิทธิ์ปิดทิกเก็ตนี้",
+        "ticket_closing_title": "🔒 กำลังปิดทิกเก็ต",
+        "ticket_closing_desc": "ห้องนี้จะถูกลบใน 5 วินาที โดย {member} แล้วเจอกันใหม่ {wave}",
+        "ticket_closing_desc_simple": "ห้องนี้จะถูกลบใน 5 วินาที โดย {member}",
+        "ticket_not_a_ticket_title": "ไม่ใช่ห้องทิกเก็ต",
+        "ticket_not_a_ticket_desc": "❌ ห้องนี้ไม่ใช่ห้องทิกเก็ต",
+        "ticket_panel_title": "🎫 ติดต่อทีมงาน",
+        "ticket_panel_desc": "กดปุ่มด้านล่างเพื่อเปิดทิกเก็ตส่วนตัวสำหรับติดต่อทีมงาน\n{divider}\nทีมงานจะเข้ามาช่วยเหลือคุณโดยเร็วที่สุด 💬",
+        "ticket_setup_success_title": "ตั้งค่าสำเร็จ ✅",
+        "ticket_setup_sending": "กำลังส่งข้อความระบบทิกเก็ต...",
+        "ticket_open_button": "เปิดทิกเก็ต",
+        "ticket_close_button": "ปิดทิกเก็ต",
+
+        "scripthub_empty_title": "ยังไม่มีรายการ",
+        "scripthub_empty_desc": "❌ ยังไม่มีรายการให้เลือก กรุณาแจ้งแอดมินให้เพิ่มด้วย `/scripthub_additem`",
+        "scripthub_item_missing_title": "ไม่พบรายการ",
+        "scripthub_item_missing_desc": "❌ ไม่พบรายการนี้แล้ว (อาจถูกลบไป) กรุณากด Refresh Menu แล้วลองใหม่",
+        "scripthub_dm_default_content": "นี่คือไฟล์ **{label}** ของคุณค่ะ",
+        "scripthub_sent_title": "ส่งสำเร็จ ✅",
+        "scripthub_sent_desc": "ส่ง **{label}** เข้า DM ให้แล้ว ตรวจสอบกล่องข้อความส่วนตัวได้เลยครับ 📬 {clap}",
+        "scripthub_dm_forbidden_title": "ส่ง DM ไม่ได้",
+        "scripthub_dm_forbidden_desc": "❌ กรุณาเปิดรับข้อความส่วนตัวจากสมาชิกในเซิร์ฟเวอร์นี้ก่อน (ตั้งค่า Privacy Settings)",
+        "scripthub_send_error_title": "เกิดข้อผิดพลาด",
+        "scripthub_send_error_desc": "❌ เกิดข้อผิดพลาดระหว่างส่งไฟล์ กรุณาลองใหม่อีกครั้ง",
+        "scripthub_select_placeholder": "✨ เลือกสคริปต์/ไฟล์ที่ต้องการ...",
+        "scripthub_no_items_option": "ยังไม่มีรายการ",
+        "scripthub_refresh_button": "Refresh Menu",
+        "scripthub_default_title": "SCRIPT HUB PANEL",
+        "scripthub_default_desc": "เลือกสคริปต์ที่ต้องการจากเมนูด้านล่าง แล้วบอทจะส่งเข้า DM ให้ทันที",
+        "scripthub_how_to_use": "📥 **วิธีใช้:** กดที่เมนู ▾ เลือกรายการ รอรับข้อความทาง DM",
+        "scripthub_items_ready_footer": "{count} รายการพร้อมให้บริการ",
+        "scripthub_missing_data_title": "ข้อมูลไม่ครบ",
+        "scripthub_missing_data_desc": "❌ ต้องใส่อย่างน้อยหนึ่งอย่าง: ข้อความ (content) หรือไฟล์แนบ (file)",
+        "scripthub_not_setup_title": "ยังไม่ได้สร้างแผง",
+        "scripthub_not_setup_desc": "❌ ยังไม่ได้สร้างแผงในเซิร์ฟเวอร์นี้ กรุณาใช้ `/scripthub_setup` ก่อน",
+        "scripthub_duplicate_title": "ชื่อซ้ำ",
+        "scripthub_duplicate_desc": "❌ มีรายการชื่อนี้อยู่แล้ว กรุณาใช้ชื่ออื่น",
+        "scripthub_full_title": "เต็มแล้ว",
+        "scripthub_full_desc": "❌ แผงนี้มีรายการครบ 25 แล้ว (ข้อจำกัดของ Discord)",
+        "scripthub_creating_title": "กำลังสร้างแผง ✅",
+        "scripthub_creating_desc": "กำลังสร้างแผงแจกไฟล์...",
+        "scripthub_setup_done": "✅ สร้างแผงเรียบร้อย ใช้ /scripthub_additem เพื่อเพิ่มรายการต่อได้เลย",
+        "scripthub_item_added_title": "เพิ่มรายการสำเร็จ ✅",
+        "scripthub_item_added_desc": "เพิ่มรายการ **{label}** เรียบร้อย {note}",
+        "scripthub_note_updated": "และอัปเดตแผงที่แสดงอยู่ให้แล้ว",
+        "scripthub_note_not_found": "(หาแผงที่แสดงอยู่ไม่เจอ ลองกด Refresh Menu บนแผงเอง)",
+        "scripthub_no_items_title": "ไม่มีรายการ",
+        "scripthub_no_items_desc": "❌ ยังไม่มีรายการใด ๆ ในแผงนี้",
+        "scripthub_item_not_found_title": "ไม่พบรายการ",
+        "scripthub_item_not_found_desc": "❌ ไม่พบรายการนี้",
+        "scripthub_removed_title": "ลบรายการสำเร็จ ✅",
+        "scripthub_removed_desc": "ลบรายการ **{label}** แล้ว {note}",
+        "scripthub_note_removed_updated": "และอัปเดตแผงที่แสดงอยู่ให้แล้ว",
+        "scripthub_note_removed_not_found": "(ลองกด Refresh Menu บนแผงเอง)",
+        "scripthub_empty_list_title": "ว่างเปล่า",
+        "scripthub_empty_list_desc": "📭 ยังไม่มีรายการในแผงนี้",
+        "scripthub_list_title": "📋 รายการในแผงแจกไฟล์/เทมเพลต",
+        "scripthub_kind_file": "📎 ไฟล์",
+        "scripthub_kind_text": "💬 ข้อความ",
+
+        "ai_no_key_configured": "❌ ยังไม่ได้ตั้งค่า GROQ_API_KEY บนเซิร์ฟเวอร์ที่รันบอท กรุณาแจ้งผู้ดูแลบอทให้ตั้งค่าใน .env",
+        "ai_rate_limited": "⏳ ตอนนี้ AI ถูกใช้งานเยอะเกินลิมิตชั่วคราว กรุณาลองใหม่อีกสักครู่",
+        "ai_generic_error": "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้ง",
+        "ai_empty_reply": "🤔 ขอโทษด้วย ตอนนี้ตอบไม่ได้ ลองถามใหม่อีกครั้งนะ",
+        "ai_setup_success_title": "ตั้งค่า AI สำเร็จ ✅",
+        "ai_setup_success_desc": "เปิดใช้งานระบบ AI ตอบแชทแล้ว\nขอบเขตการตอบ: {where}",
+        "ai_setup_where_channel": "{channel}",
+        "ai_setup_where_mention": "การแท็ก @บอท ในห้องไหนก็ได้ของเซิร์ฟเวอร์นี้",
+        "ai_toggle_updated_title": "อัปเดตแล้ว",
+        "ai_toggle_updated_desc": "ระบบ AI ตอบแชท: {status}",
+        "ai_toggle_on": "เปิดใช้งาน ✅",
+        "ai_toggle_off": "ปิดใช้งาน ⛔",
+        "ai_persona_success_title": "ตั้งค่าบุคลิกสำเร็จ ✅",
+        "ai_persona_success_desc": "อัปเดต persona ของ AI แล้ว ข้อความถัดไปจะใช้กติกาใหม่นี้",
+        "ai_reset_success_title": "ล้างความจำแล้ว ✅",
+        "ai_reset_success_desc": "AI จะเริ่มบทสนทนาใหม่ในห้องนี้ (ไม่มีประวัติเก่าติดมา)",
+        "ai_default_persona": (
+            "คุณคือ BOB_BOT ผู้ช่วย AI ประจำเซิร์ฟเวอร์ Discord พูดจาเป็นกันเอง สุภาพ กระชับ ไม่ยืดเยื้อ "
+            "ตอบเป็นภาษาไทยเป็นหลัก (ยกเว้นผู้ใช้พิมพ์ภาษาอื่นมาก็ตอบภาษานั้นได้) "
+            "ถ้าไม่แน่ใจให้บอกตามตรงว่าไม่แน่ใจ อย่าแต่งข้อมูลขึ้นมาเอง และหลีกเลี่ยงเนื้อหาที่ไม่เหมาะสม"
+        ),
+
+        "settings_title": "⚙️ ตั้งค่าเซิร์ฟเวอร์",
+        "settings_desc": "เลือกภาษาที่ต้องการให้บอทใช้ตอบในเซิร์ฟเวอร์นี้\nภาษาปัจจุบัน: **{current}**",
+        "settings_select_placeholder": "🌐 เลือกภาษา...",
+        "settings_updated_title": "เปลี่ยนภาษาแล้ว ✅",
+        "settings_updated_desc": "บอทจะตอบเป็น **{language}** ในเซิร์ฟเวอร์นี้ต่อจากนี้",
+        "settings_no_permission_title": "ไม่มีสิทธิ์",
+        "settings_no_permission_desc": "❌ คุณต้องมีสิทธิ์ Manage Server ถึงจะเปลี่ยนค่านี้ได้",
+
+        "rules_setup_success_title": "ตั้งค่าสำเร็จ ✅",
+        "rules_setup_sending": "กำลังส่งแผงกฎเซิร์ฟเวอร์...",
+        "rules_setup_empty_note": "ยังไม่มีภาษาไหนถูกเพิ่ม — ใช้ `/rules_addsection` เพื่อเพิ่มภาษาแรก",
+        "rules_placeholder_title": "📜 กฎของเซิร์ฟเวอร์",
+        "rules_placeholder_desc": "ยังไม่มีการเพิ่มกฎ แอดมินสามารถเพิ่มได้ด้วย `/rules_addsection`",
+        "rules_not_setup_title": "ยังไม่ได้สร้างแผงกฎ",
+        "rules_not_setup_desc": "❌ กรุณาใช้ `/rules_setup` ก่อน",
+        "rules_section_added_title": "เพิ่มส่วนกฎสำเร็จ ✅",
+        "rules_section_added_desc": "เพิ่มกฎภาษา **{name}** ({code}) แล้ว {note}",
+        "rules_section_updated_desc": "อัปเดตกฎภาษา **{name}** ({code}) แล้ว {note}",
+        "rules_note_live_updated": "และอัปเดตแผงที่แสดงอยู่ให้แล้ว",
+        "rules_note_live_missing": "(หาแผงที่แสดงอยู่ไม่เจอ ลองรัน `/rules_setup` อีกครั้ง)",
+        "rules_section_removed_title": "ลบส่วนกฎสำเร็จ ✅",
+        "rules_section_removed_desc": "ลบกฎภาษา **{code}** แล้ว {note}",
+        "rules_section_not_found_title": "ไม่พบส่วนกฎนี้",
+        "rules_section_not_found_desc": "❌ ไม่พบกฎภาษา **{code}**",
+        "rules_no_sections_title": "ยังไม่มีข้อมูล",
+        "rules_no_sections_desc": "📭 ยังไม่มีส่วนกฎใด ๆ ใช้ `/rules_addsection` เพื่อเพิ่ม",
+        "rules_list_title": "📋 รายการกฎในเซิร์ฟเวอร์นี้",
+        "rules_too_many_title": "มีภาษาเยอะเกินไป",
+        "rules_too_many_desc": "❌ หนึ่งข้อความแสดง embed ได้สูงสุด 10 อัน ตอนนี้แผงนี้มี {count} แล้ว",
+
+        "clear_success_title": "ลบข้อความสำเร็จ 🧹",
+        "clear_success_desc": "ลบข้อความไปแล้ว **{count}** ข้อความ สะอาดเอี่ยม {clap}",
+        "warn_title": "⚠️ คำเตือน",
+        "warn_desc": "{member} ถูกเตือนโดย {mod}",
+        "warn_reason_field": "📄 เหตุผล",
+        "warn_dm_title": "คุณถูกเตือน ⚠️",
+        "warn_dm_desc": "คุณถูกเตือนในเซิร์ฟเวอร์ **{guild}**",
+        "kick_no_permission_title": "ไม่มีสิทธิ์",
+        "kick_no_permission_desc": "❌ บอทไม่มีสิทธิ์เตะสมาชิกคนนี้ (ตรวจสอบลำดับยศของบอท)",
+        "kick_success_title": "👢 เตะสมาชิกออกแล้ว",
+        "kick_success_desc": "{member} ถูกเตะออกจากเซิร์ฟเวอร์",
+        "ban_no_permission_title": "ไม่มีสิทธิ์",
+        "ban_no_permission_desc": "❌ บอทไม่มีสิทธิ์แบนสมาชิกคนนี้ (ตรวจสอบลำดับยศของบอท)",
+        "ban_success_title": "🔨 แบนสมาชิกแล้ว",
+        "ban_success_desc": "{member} ถูกแบนออกจากเซิร์ฟเวอร์",
+        "timeout_no_permission_title": "ไม่มีสิทธิ์",
+        "timeout_no_permission_desc": "❌ บอทไม่มีสิทธิ์ timeout สมาชิกคนนี้ (ตรวจสอบลำดับยศของบอท)",
+        "timeout_success_title": "🔇 ปิดปากชั่วคราว",
+        "timeout_success_desc": "{member} ถูกปิดปากเป็นเวลา **{minutes} นาที**",
+        "reason_not_specified": "ไม่ระบุเหตุผล",
+        "addrole_success_title": "เพิ่มยศสำเร็จ ✅",
+        "addrole_success_desc": "เพิ่มยศ {role} ให้ {member} แล้ว {thumbsup}",
+        "removerole_success_title": "ลบยศสำเร็จ ➖",
+        "removerole_success_desc": "ลบยศ {role} ออกจาก {member} แล้ว {ohno}",
+        "nick_success_title": "เปลี่ยนชื่อเล่นสำเร็จ ✏️",
+        "nick_success_desc": "เปลี่ยนชื่อเล่นของ {member} เป็น **{nick}** แล้ว {laughter}",
+
+        "rolemenu_created_sending": "กำลังสร้างเมนูรับยศ...",
+        "rolemenu_created_note": "✅ สร้างเมนูเรียบร้อย ใช้คำสั่ง `/rolemenu_add message_id:{id}` เพื่อเพิ่มตัวเลือกยศ",
+        "rolemenu_role_too_high_title": "ยศสูงเกินไป",
+        "rolemenu_role_too_high_desc": "❌ ยศที่เลือกอยู่สูงกว่าหรือเท่ากับยศของบอท กรุณาเลื่อนยศบอทให้สูงกว่ายศนี้ก่อน",
+        "rolemenu_not_found_title": "ไม่พบเมนู",
+        "rolemenu_not_found_desc": "❌ ไม่พบเมนูนี้ กรุณาสร้างด้วย `/rolemenu_create` ก่อน",
+        "rolemenu_message_not_found_title": "ไม่พบข้อความ",
+        "rolemenu_message_not_found_desc": "❌ ไม่พบข้อความนี้ในห้องนี้ กรุณาใช้คำสั่งในห้องเดียวกับที่สร้างเมนู",
+        "rolemenu_bad_emoji_title": "อิโมจิไม่ถูกต้อง",
+        "rolemenu_bad_emoji_desc": "❌ อิโมจิไม่ถูกต้อง หรือบอทใช้อิโมจินี้ไม่ได้",
+        "rolemenu_option_added_title": "เพิ่มตัวเลือกสำเร็จ ✅",
+        "rolemenu_option_added_desc": "เพิ่ม {emoji} → {role} เข้าเมนูแล้ว",
+        "rolemenu_option_not_found_title": "ไม่พบตัวเลือก",
+        "rolemenu_option_not_found_desc": "❌ ไม่พบตัวเลือกนี้ในเมนู",
+        "rolemenu_option_removed_title": "ลบตัวเลือกสำเร็จ ✅",
+        "rolemenu_option_removed_desc": "ลบ {emoji} ออกจากเมนูแล้ว",
+        "rolemenu_role_deleted": "(ยศถูกลบ)",
+
+        "ping_pong_title": "🏓 Pong!",
+        "ping_pong_desc": "ความหน่วงของบอทตอนนี้อยู่ที่ **{ms}ms** {mood}",
+        "userinfo_title": "👤 ข้อมูลของ {member}",
+        "userinfo_username_field": "🏷️ ชื่อผู้ใช้",
+        "userinfo_id_field": "🆔 ID",
+        "userinfo_joined_field": "📥 เข้าร่วมเซิร์ฟเวอร์เมื่อ",
+        "userinfo_created_field": "🎂 สร้างบัญชีเมื่อ",
+        "userinfo_roles_field": "🎭 ยศ ({count})",
+        "userinfo_no_roles": "ไม่มี",
+        "serverinfo_owner_field": "👑 เจ้าของ",
+        "serverinfo_members_field": "👥 จำนวนสมาชิก",
+        "serverinfo_boosts_field": "🚀 บูสต์",
+        "serverinfo_created_field": "📅 สร้างเมื่อ",
+        "serverinfo_channels_field": "💬 จำนวนห้อง",
+        "serverinfo_roles_field": "🎭 จำนวนยศ",
+        "poll_title": "📊 โพลใหม่",
+        "poll_desc": "**{question}**\n{divider}\nกดรีแอคด้านล่างเพื่อโหวต {gamer}",
+        "say_sent_title": "ส่งข้อความแล้ว ✅",
+        "say_sent_desc": "ข้อความถูกส่งเรียบร้อย {wink}",
+        "user_lookup_not_found_title": "ไม่พบผู้ใช้",
+        "user_lookup_not_found_desc": "❌ ไม่พบผู้ใช้ Roblox ชื่อ **{username}** กรุณาตรวจสอบชื่อ/ID อีกครั้ง",
+        "user_lookup_failed_title": "ดึงข้อมูลไม่สำเร็จ",
+        "user_lookup_failed_desc": (
+            "❌ ไม่สามารถดึงข้อมูลจาก Rolimon's สำหรับ **{name}** ได้ในตอนนี้\n"
+            "สาเหตุที่เป็นไปได้: ผู้ใช้นี้ยังไม่เคยถูกเก็บสถิติใน Rolimon's หรือ API ถูกจำกัด/บล็อกการเข้าถึงชั่วคราว "
+            "(Rolimon's เริ่มบล็อกการเรียก API นี้จากบางโฮสต์ตั้งแต่ต้นปี 2569)"
+        ),
+        "user_lookup_no_data": "ไม่มีข้อมูล",
+        "user_lookup_footer": "Stats updated a few seconds ago, refresh stats by visiting the profile page",
+
+        "help_title": "📖 คำสั่งทั้งหมดของ BOB_BOT",
+        "help_desc": "รวมทุกคำสั่งที่ใช้งานได้ในเซิร์ฟเวอร์นี้",
+        "help_moderation": "🛡️ Moderation",
+        "help_roles": "🎭 จัดการยศ",
+        "help_general": "💬 ทั่วไป",
+        "help_roblox": "🟦 Roblox / Rolimon's",
+        "help_roblox_desc": "`/user` — ดูสถิติ Roblox ของผู้ใช้ (RAP, Value, Collectibles, Value Rank)",
+        "help_verify": "⭐ ยืนยันตัวตน",
+        "help_verify_desc": "`/setupverify` — ตั้งค่า+ส่งข้อความยืนยันตัวตน (กดปุ่มรับยศ)",
+        "help_rolemenu": "🎭 เมนูรับยศด้วยรีแอค",
+        "help_ticket": "🎫 ระบบทิกเก็ต",
+        "help_scripthub": "📂 แผงแจกไฟล์/เทมเพลต (Script Hub)",
+        "help_ai": "🤖 AI ตอบแชท",
+        "help_rules": "📜 กฎเซิร์ฟเวอร์",
+        "help_settings": "⚙️ ตั้งค่า",
+        "help_settings_desc": "`/settings` — เลือกภาษาที่บอทจะใช้ตอบในเซิร์ฟเวอร์นี้",
+
+        "error_no_permission": "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้",
+        "error_generic_title": "เกิดข้อผิดพลาด",
+        "error_generic_desc": "❌ เกิดข้อผิดพลาดขณะทำคำสั่งนี้ กรุณาลองใหม่อีกครั้ง",
+    },
+}
+
+
+def L(guild_id, key: str, **kwargs) -> str:
+    """Translate `key` into the language configured for `guild_id` (default English)."""
+    lang = get_guild_language(guild_id)
+    table = TRANSLATIONS.get(lang) or TRANSLATIONS[DEFAULT_LANGUAGE]
+    text = table.get(key)
+    if text is None:
+        text = TRANSLATIONS[DEFAULT_LANGUAGE].get(key, key)
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except Exception:
+            return text
+    return text
+
+
+class LanguageSelect(discord.ui.Select):
+    def __init__(self, guild_id: int):
+        options = [
+            discord.SelectOption(
+                label=info["name"],
+                value=code,
+                emoji=info["flag"],
+                default=(code == get_guild_language(guild_id)),
+            )
+            for code, info in AVAILABLE_LANGUAGES.items()
+        ]
+        super().__init__(
+            placeholder=L(guild_id, "settings_select_placeholder"),
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id=f"bobbot_settings_lang_{guild_id}",
+        )
+        self.guild_id = guild_id
+
+    async def callback(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                embed=base_embed(
+                    L(self.guild_id, "settings_no_permission_title"),
+                    L(self.guild_id, "settings_no_permission_desc"),
+                    color=Theme.DANGER,
+                    guild=interaction.guild,
+                ),
+                ephemeral=True,
+            )
+            return
+
+        lang_code = self.values[0]
+        set_guild_language(self.guild_id, lang_code)
+        lang_name = AVAILABLE_LANGUAGES[lang_code]["name"]
+
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(self.guild_id, "settings_updated_title"),
+                L(self.guild_id, "settings_updated_desc", language=lang_name),
+                color=Theme.SUCCESS,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+
+
+class SettingsView(discord.ui.View):
+    def __init__(self, guild_id: int):
+        super().__init__(timeout=120)
+        self.add_item(LanguageSelect(guild_id))
+
+
 # ---------------------------------------------------------
-# Keep-alive HTTP server (สำหรับ Render Free Plan)
+# Keep-alive HTTP server (for Render Free Plan)
 # ---------------------------------------------------------
-# Render free tier จะ sleep service ถ้าไม่มี HTTP request เข้ามาใน 15 นาที
-# เปิด Flask server เล็ก ๆ ไว้ ให้บริการ ping ภายนอก (เช่น UptimeRobot) ยิงเข้ามาได้
 keep_alive_app = Flask(__name__)
 
 
@@ -176,24 +794,20 @@ def keep_alive_home():
 
 
 def run_keep_alive_server():
-    port = int(os.getenv("PORT", 10000))  # Render จะกำหนด PORT ผ่าน env ให้อัตโนมัติ
+    port = int(os.getenv("PORT", 10000))
     keep_alive_app.run(host="0.0.0.0", port=port)
 
 
 def start_keep_alive():
     thread = threading.Thread(target=run_keep_alive_server, daemon=True)
     thread.start()
-    logger.info("เริ่ม keep-alive HTTP server แล้ว")
+    logger.info("Keep-alive HTTP server started")
 
 
-# ---------------------------------------------------------
-# อ่านค่า TOKEN ให้ถูกต้อง (แก้บั๊กเดิมที่เอา token ไปเป็น "ชื่อ" env var)
-# ---------------------------------------------------------
-# แก้ไขให้เหลือเฉพาะชื่อตัวแปรในวงเล็บ
 TOKEN = os.getenv("BOT_TOKEN")
 
 # ---------------------------------------------------------
-# ระบบ AI ตอบแชท (Groq API)
+# AI chat system (Groq API)
 # ---------------------------------------------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-120b")
@@ -202,16 +816,16 @@ groq_client = None
 if GROQ_API_KEY:
     groq_client = Groq(api_key=GROQ_API_KEY)
 else:
-    logger.warning("ไม่พบ GROQ_API_KEY — ระบบ AI ตอบแชทจะทำงานไม่ได้จนกว่าจะตั้งค่าใน .env")
+    logger.warning("GROQ_API_KEY not found — the AI chat system won't work until it's set in .env")
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
-bot.startup_done = False  # ใช้กันไม่ให้ sync คำสั่ง/โหลด emoji ซ้ำทุกครั้งที่ reconnect (กัน global rate limit)
+bot.startup_done = False
 
-# ---------- ระบบเก็บค่ายศยืนยันตัวตนต่อเซิร์ฟเวอร์ ----------
+# ---------- Verification role config ----------
 VERIFY_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "verify_config.json")
 
 
@@ -221,7 +835,7 @@ def load_verify_config() -> dict:
             with open(VERIFY_CONFIG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            logger.warning("อ่านไฟล์ verify_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            logger.warning("Could not read verify_config.json — starting empty")
             return {}
     return {}
 
@@ -234,7 +848,7 @@ def save_verify_config(config: dict) -> None:
 verify_config = load_verify_config()  # { "guild_id": role_id }
 
 
-# ---------- ระบบเก็บค่าเมนูรับยศ (Reaction Role) ----------
+# ---------- Reaction role menu config ----------
 REACTIONROLE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "reactionrole_config.json")
 
 
@@ -244,7 +858,7 @@ def load_reactionrole_config() -> dict:
             with open(REACTIONROLE_CONFIG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            logger.warning("อ่านไฟล์ reactionrole_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            logger.warning("Could not read reactionrole_config.json — starting empty")
             return {}
     return {}
 
@@ -254,11 +868,10 @@ def save_reactionrole_config(config: dict) -> None:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
-# โครงสร้าง: { "guild_id": { "message_id": { "emoji_str": role_id } } }
 reactionrole_config = load_reactionrole_config()
 
 
-# ---------- ระบบเก็บค่าทิกเก็ต (Ticket) ----------
+# ---------- Ticket config ----------
 TICKET_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ticket_config.json")
 
 
@@ -268,7 +881,7 @@ def load_ticket_config() -> dict:
             with open(TICKET_CONFIG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            logger.warning("อ่านไฟล์ ticket_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            logger.warning("Could not read ticket_config.json — starting empty")
             return {}
     return {}
 
@@ -278,11 +891,10 @@ def save_ticket_config(config: dict) -> None:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
-# โครงสร้าง: { "guild_id": {"category_id": int, "support_role_id": int} }
 ticket_config = load_ticket_config()
 
 
-# ---------- ระบบเก็บค่าแผงแจกไฟล์/เทมเพลต (Script/File Hub Panel) ----------
+# ---------- Script/File hub panel config ----------
 SCRIPTHUB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "scripthub_config.json")
 SCRIPTHUB_FILES_DIR = os.path.join(os.path.dirname(__file__), "scripthub_files")
 os.makedirs(SCRIPTHUB_FILES_DIR, exist_ok=True)
@@ -294,7 +906,7 @@ def load_scripthub_config() -> dict:
             with open(SCRIPTHUB_CONFIG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            logger.warning("อ่านไฟล์ scripthub_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            logger.warning("Could not read scripthub_config.json — starting empty")
             return {}
     return {}
 
@@ -304,17 +916,10 @@ def save_scripthub_config(config: dict) -> None:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
-# โครงสร้าง:
-# { "guild_id": {
-#     "channel_id": int, "message_id": int,
-#     "title": str, "description": str, "image_url": str|None,
-#     "items": [ {"label": str, "description": str, "content": str|None,
-#                 "file_path": str|None, "file_name": str|None} ]
-# } }
 scripthub_config = load_scripthub_config()
 
 
-# ---------- ระบบเก็บค่า AI ตอบแชท ----------
+# ---------- AI chat config ----------
 AI_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ai_config.json")
 
 
@@ -324,7 +929,7 @@ def load_ai_config() -> dict:
             with open(AI_CONFIG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            logger.warning("อ่านไฟล์ ai_config.json ไม่ได้ จะเริ่มด้วยค่าว่าง")
+            logger.warning("Could not read ai_config.json — starting empty")
             return {}
     return {}
 
@@ -334,17 +939,9 @@ def save_ai_config(config: dict) -> None:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
-# โครงสร้าง: { "guild_id": {"enabled": bool, "channel_id": int|None, "persona": str|None} }
 ai_config = load_ai_config()
 
-DEFAULT_AI_PERSONA = (
-    "คุณคือ BOB_BOT ผู้ช่วย AI ประจำเซิร์ฟเวอร์ Discord พูดจาเป็นกันเอง สุภาพ กระชับ ไม่ยืดเยื้อ "
-    "ตอบเป็นภาษาไทยเป็นหลัก (ยกเว้นผู้ใช้พิมพ์ภาษาอื่นมาก็ตอบภาษานั้นได้) "
-    "ถ้าไม่แน่ใจให้บอกตามตรงว่าไม่แน่ใจ อย่าแต่งข้อมูลขึ้นมาเอง และหลีกเลี่ยงเนื้อหาที่ไม่เหมาะสม"
-)
-
-# เก็บบทสนทนาล่าสุดต่อห้อง (อยู่ในหน่วยความจำเท่านั้น หายเมื่อบอทรีสตาร์ท — ถือเป็นความจำระยะสั้นพอ)
-AI_HISTORY_LIMIT = 12  # เก็บแค่ 12 ข้อความล่าสุดต่อห้อง (รวม user+assistant) กัน context ยาวเกิน/ค่าใช้จ่ายสูง
+AI_HISTORY_LIMIT = 12
 ai_conversations: dict[int, deque] = {}
 
 
@@ -354,13 +951,39 @@ def get_ai_history(channel_id: int) -> deque:
     return ai_conversations[channel_id]
 
 
-async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_message: str) -> str:
-    """เรียก Groq API เพื่อสร้างคำตอบ โดยใช้ประวัติแชทสั้น ๆ ของห้องนั้นประกอบ context"""
+# ---------- Rules panel config ----------
+RULES_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "rules_config.json")
+
+
+def load_rules_config() -> dict:
+    if os.path.exists(RULES_CONFIG_PATH):
+        try:
+            with open(RULES_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Could not read rules_config.json — starting empty")
+            return {}
+    return {}
+
+
+def save_rules_config(config: dict) -> None:
+    with open(RULES_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+# Structure: { "guild_id": {
+#   "channel_id": int, "message_id": int,
+#   "sections": [ {"code": "EN", "name": "English", "color": int, "content": str} ]
+# } }
+rules_config = load_rules_config()
+
+
+async def generate_ai_reply(guild_id: int, channel_id: int, persona: str, user_name: str, user_message: str) -> str:
+    """Call the Groq API to generate a reply, using the channel's short-term history as context."""
     if not groq_client:
-        return "❌ ยังไม่ได้ตั้งค่า GROQ_API_KEY บนเซิร์ฟเวอร์ที่รันบอท กรุณาแจ้งผู้ดูแลบอทให้ตั้งค่าใน .env"
+        return L(guild_id, "ai_no_key_configured")
 
     history = get_ai_history(channel_id)
-    # Groq ใช้รูปแบบ OpenAI-style: {"role": "user"/"assistant", "content": "..."}
     new_turn = {"role": "user", "content": f"{user_name}: {user_message}"}
     messages = [{"role": "system", "content": persona}] + list(history) + [new_turn]
 
@@ -370,7 +993,6 @@ async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_
             messages=messages,
         )
 
-    # เจอ error rate limit ให้ลองใหม่แบบเว้นช่วงเพิ่มขึ้นก่อนจะยอมแพ้
     max_retries = 3
     response = None
     for attempt in range(1, max_retries + 1):
@@ -379,31 +1001,28 @@ async def generate_ai_reply(channel_id: int, persona: str, user_name: str, user_
             break
         except RateLimitError as e:
             if attempt == max_retries:
-                logger.warning(f"Groq API โควตาหมด/rate limit ลองซ้ำครบ {max_retries} ครั้งแล้วยังไม่สำเร็จ: {e}")
-                return "⏳ ตอนนี้ AI ถูกใช้งานเยอะเกินลิมิตชั่วคราว กรุณาลองใหม่อีกสักครู่"
-            wait_seconds = 2 * attempt  # 2s, 4s, ...
-            logger.warning(f"Groq API rate limit — รอ {wait_seconds}s แล้วลองใหม่ (ครั้งที่ {attempt}/{max_retries})")
+                logger.warning(f"Groq API rate limit hit — gave up after {max_retries} attempts: {e}")
+                return L(guild_id, "ai_rate_limited")
+            wait_seconds = 2 * attempt
+            logger.warning(f"Groq API rate limited — waiting {wait_seconds}s before retry ({attempt}/{max_retries})")
             await asyncio.sleep(wait_seconds)
         except APIStatusError as e:
-            # error ฝั่ง Groq (เช่น model ไม่ถูกต้อง, auth ผิด ฯลฯ) — ไม่โชว์ raw error ให้ user เห็น
-            logger.exception(f"Groq API ตอบ error: {e}")
-            return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้ง"
+            logger.exception(f"Groq API returned an error: {e}")
+            return L(guild_id, "ai_generic_error")
         except Exception:
-            logger.exception("เรียก Groq API ไม่สำเร็จ (unexpected)")
-            return "❌ เรียกใช้งาน AI ไม่สำเร็จตอนนี้ กรุณาลองใหม่อีกครั้ง"
+            logger.exception("Failed to call Groq API (unexpected)")
+            return L(guild_id, "ai_generic_error")
 
     reply_text = (response.choices[0].message.content or "").strip() if response else ""
     if not reply_text:
-        reply_text = "🤔 ขอโทษด้วย ตอนนี้ตอบไม่ได้ ลองถามใหม่อีกครั้งนะ"
+        reply_text = L(guild_id, "ai_empty_reply")
 
-    # เก็บทั้งคำถามและคำตอบไว้เป็น context สำหรับข้อความถัดไปในห้องเดียวกัน (รูปแบบ OpenAI-style: role "assistant")
     history.append(new_turn)
     history.append({"role": "assistant", "content": reply_text})
     return reply_text
 
 
 def split_for_discord(text: str, limit: int = 1900) -> list:
-    """ตัดข้อความยาวให้พอดีกับลิมิต 2000 ตัวอักษรของ Discord ต่อหนึ่งข้อความ"""
     if len(text) <= limit:
         return [text]
     chunks = []
@@ -415,16 +1034,13 @@ def split_for_discord(text: str, limit: int = 1900) -> list:
 
 
 def safe_filename_part(text: str, fallback: str = "item") -> str:
-    """กรองข้อความให้เหลือเฉพาะอักขระที่ปลอดภัยสำหรับใช้ประกอบชื่อไฟล์/พาธ (กัน path traversal)"""
     cleaned = "".join(c for c in text if c.isalnum() or c in "._- ").strip()
     return cleaned or fallback
 
 
 # =========================================================
-# ระบบดึงข้อมูล Roblox/Rolimon's (RAP, Value, Collectibles, Value Rank)
-# — ใช้กับคำสั่ง /user เพื่อแสดงสถิติสไตล์ RoliBot
+# Roblox / Rolimon's lookups (RAP, Value, Collectibles, Value Rank)
 # =========================================================
-# ต้องใส่ User-Agent + Referer ปลอมเป็นเบราว์เซอร์จริง ไม่งั้น Rolimon's มักตอบ 403
 ROLIMONS_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -435,8 +1051,6 @@ ROLIMONS_HEADERS = {
 
 
 async def resolve_roblox_user(query: str) -> dict | None:
-    """แปลงชื่อผู้ใช้ (หรือ User ID) ที่ผู้ใช้พิมพ์ ให้เป็นข้อมูล Roblox จริง
-    คืนค่า {"id": int, "name": str, "display_name": str} หรือ None ถ้าหาไม่เจอ"""
     query = query.strip()
     try:
         async with aiohttp.ClientSession() as session:
@@ -473,12 +1087,11 @@ async def resolve_roblox_user(query: str) -> dict | None:
                         "display_name": found.get("displayName") or found["name"],
                     }
     except (aiohttp.ClientError, asyncio.TimeoutError):
-        logger.exception("ค้นหาผู้ใช้ Roblox ไม่สำเร็จ")
+        logger.exception("Failed to resolve Roblox user")
         return None
 
 
 async def fetch_rolimons_playerinfo(user_id: int) -> dict | None:
-    """ดึงข้อมูล RAP/Value/Rank จาก Rolimon's — คืน None ถ้าหาไม่เจอ/ถูกบล็อก (403)"""
     url = f"https://api.rolimons.com/players/v1/playerinfo/{user_id}"
     try:
         async with aiohttp.ClientSession() as session:
@@ -486,19 +1099,18 @@ async def fetch_rolimons_playerinfo(user_id: int) -> dict | None:
                 url, headers=ROLIMONS_HEADERS, timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
                 if resp.status != 200:
-                    logger.warning(f"Rolimon's playerinfo ตอบ HTTP {resp.status} สำหรับ user {user_id}")
+                    logger.warning(f"Rolimon's playerinfo returned HTTP {resp.status} for user {user_id}")
                     return None
                 data = await resp.json()
                 if data.get("success") is False:
                     return None
                 return data
     except (aiohttp.ClientError, asyncio.TimeoutError):
-        logger.exception("เรียก Rolimon's playerinfo ไม่สำเร็จ")
+        logger.exception("Failed to call Rolimon's playerinfo")
         return None
 
 
 async def fetch_rolimons_collectibles(user_id: int) -> int | None:
-    """นับจำนวนไอเทม (collectibles) ทั้งหมดจาก playerassets ของ Rolimon's — คืน None ถ้าดึงไม่ได้/ปิดความเป็นส่วนตัว"""
     url = f"https://api.rolimons.com/players/v1/playerassets/{user_id}"
     try:
         async with aiohttp.ClientSession() as session:
@@ -518,12 +1130,11 @@ async def fetch_rolimons_collectibles(user_id: int) -> int | None:
                     return total
                 return None
     except (aiohttp.ClientError, asyncio.TimeoutError):
-        logger.exception("เรียก Rolimon's playerassets ไม่สำเร็จ")
+        logger.exception("Failed to call Rolimon's playerassets")
         return None
 
 
 async def fetch_roblox_avatar(user_id: int) -> str | None:
-    """ดึง URL รูปตัวละคร Roblox (full-body render) ของผู้ใช้ สำหรับใช้เป็น thumbnail"""
     url = (
         "https://thumbnails.roblox.com/v1/users/avatar"
         f"?userIds={user_id}&size=250x250&format=Png&isCircular=false"
@@ -543,8 +1154,6 @@ async def fetch_roblox_avatar(user_id: int) -> str | None:
 
 
 class RolimonsProfileView(discord.ui.View):
-    """ปุ่มลิงก์ไปหน้า Profile และ History บน Rolimon's (สไตล์เดียวกับการ์ด RoliBot)"""
-
     def __init__(self, user_id: int):
         super().__init__(timeout=None)
         self.add_item(
@@ -566,27 +1175,27 @@ class RolimonsProfileView(discord.ui.View):
 
 
 # =========================================================
-# ระบบยืนยันตัวตน (Verification) — กดปุ่มแล้วรับยศทันที
+# Verification system — button grants a role instantly
 # =========================================================
 class VerifyView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # ปุ่มถาวร ใช้ได้ตลอดแม้บอทรีสตาร์ท
+        super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="ยืนยันตัวตน",
+        label="Verify",
         style=discord.ButtonStyle.success,
         emoji="⭐",
         custom_id="bobbot_verify_button",
     )
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild_id = str(interaction.guild.id)
-        role_id = verify_config.get(guild_id)
+        guild_id = interaction.guild.id
+        role_id = verify_config.get(str(guild_id))
 
         if not role_id:
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ยังไม่ได้ตั้งค่า",
-                    "❌ ยังไม่ได้ตั้งค่ายศยืนยันตัวตนสำหรับเซิร์ฟเวอร์นี้\nกรุณาแจ้งแอดมินให้ใช้คำสั่ง `/setupverify`",
+                    L(guild_id, "verify_not_configured_title"),
+                    L(guild_id, "verify_not_configured_desc"),
                     color=Theme.WARNING,
                     guild=interaction.guild,
                 ),
@@ -598,8 +1207,8 @@ class VerifyView(discord.ui.View):
         if not role:
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ไม่พบยศ",
-                    "❌ ไม่พบยศที่ตั้งค่าไว้ (อาจถูกลบไปแล้ว) กรุณาแจ้งแอดมิน",
+                    L(guild_id, "verify_role_missing_title"),
+                    L(guild_id, "verify_role_missing_desc"),
                     color=Theme.DANGER,
                     guild=interaction.guild,
                 ),
@@ -609,17 +1218,22 @@ class VerifyView(discord.ui.View):
 
         if role in interaction.user.roles:
             await interaction.response.send_message(
-                embed=base_embed("ยืนยันแล้ว", "✅ คุณยืนยันตัวตนไปแล้ว", color=Theme.SUCCESS, guild=interaction.guild),
+                embed=base_embed(
+                    L(guild_id, "verify_already_title"),
+                    L(guild_id, "verify_already_desc"),
+                    color=Theme.SUCCESS,
+                    guild=interaction.guild,
+                ),
                 ephemeral=True,
             )
             return
 
         try:
-            await interaction.user.add_roles(role, reason="ยืนยันตัวตนผ่านปุ่ม")
+            await interaction.user.add_roles(role, reason="Verified via button")
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ยืนยันตัวตนสำเร็จ 🎉",
-                    f"คุณได้รับยศ {role.mention} เรียบร้อยแล้ว ยินดีต้อนรับ!",
+                    L(guild_id, "verify_success_title"),
+                    L(guild_id, "verify_success_desc", role=role.mention),
                     color=Theme.SUCCESS,
                     guild=interaction.guild,
                 ),
@@ -628,8 +1242,8 @@ class VerifyView(discord.ui.View):
         except discord.Forbidden:
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ผิดพลาด",
-                    "❌ บอทไม่มีสิทธิ์มอบยศนี้ (ตรวจสอบว่ายศของบอทอยู่สูงกว่ายศที่ต้องการมอบ)",
+                    L(guild_id, "verify_no_permission_title"),
+                    L(guild_id, "verify_no_permission_desc"),
                     color=Theme.DANGER,
                     guild=interaction.guild,
                 ),
@@ -638,28 +1252,28 @@ class VerifyView(discord.ui.View):
 
 
 # =========================================================
-# ระบบทิกเก็ต (Ticket System)
+# Ticket system
 # =========================================================
 class TicketOpenView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # ปุ่มถาวร
+        super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="เปิดทิกเก็ต",
+        label="Open ticket",
         style=discord.ButtonStyle.primary,
         emoji="🎫",
         custom_id="bobbot_ticket_open",
     )
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
-        guild_id = str(guild.id)
-        conf = ticket_config.get(guild_id)
+        guild_id = guild.id
+        conf = ticket_config.get(str(guild_id))
 
         if not conf or not conf.get("category_id"):
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ยังไม่ได้ตั้งค่า",
-                    "❌ ยังไม่ได้ตั้งค่าระบบทิกเก็ต กรุณาแจ้งแอดมินให้ใช้คำสั่ง `/setupticket`",
+                    L(guild_id, "ticket_not_configured_title"),
+                    L(guild_id, "ticket_not_configured_desc"),
                     color=Theme.WARNING,
                     guild=guild,
                 ),
@@ -671,8 +1285,8 @@ class TicketOpenView(discord.ui.View):
         if not category or not isinstance(category, discord.CategoryChannel):
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ไม่พบหมวดหมู่",
-                    "❌ ไม่พบหมวดหมู่ที่ตั้งค่าไว้ (อาจถูกลบไปแล้ว) กรุณาแจ้งแอดมิน",
+                    L(guild_id, "ticket_category_missing_title"),
+                    L(guild_id, "ticket_category_missing_desc"),
                     color=Theme.DANGER,
                     guild=guild,
                 ),
@@ -682,14 +1296,13 @@ class TicketOpenView(discord.ui.View):
 
         support_role = guild.get_role(int(conf["support_role_id"])) if conf.get("support_role_id") else None
 
-        # ใช้ user ID แทนชื่อผู้ใช้ในการตั้งชื่อห้อง กัน error จากอักขระพิเศษ/ภาษาอื่นที่ Discord ไม่รับ
         existing_name = f"ticket-{interaction.user.id}"
         for ch in category.text_channels:
             if ch.name == existing_name:
                 await interaction.response.send_message(
                     embed=base_embed(
-                        "มีทิกเก็ตอยู่แล้ว",
-                        f"❌ คุณมีทิกเก็ตที่เปิดอยู่แล้วที่ {ch.mention}",
+                        L(guild_id, "ticket_already_open_title"),
+                        L(guild_id, "ticket_already_open_desc", channel=ch.mention),
                         color=Theme.WARNING,
                         guild=guild,
                     ),
@@ -719,13 +1332,13 @@ class TicketOpenView(discord.ui.View):
                 category=category,
                 overwrites=overwrites,
                 topic=f"ticket_owner_id:{interaction.user.id}",
-                reason=f"เปิดทิกเก็ตโดย {interaction.user}",
+                reason=f"Ticket opened by {interaction.user}",
             )
         except discord.Forbidden:
             await interaction.followup.send(
                 embed=base_embed(
-                    "ผิดพลาด",
-                    "❌ บอทไม่มีสิทธิ์สร้างห้องในหมวดหมู่นี้ กรุณาตรวจสอบสิทธิ์ของบอท",
+                    L(guild_id, "ticket_create_forbidden_title"),
+                    L(guild_id, "ticket_create_forbidden_desc"),
                     color=Theme.DANGER,
                     guild=guild,
                 ),
@@ -733,11 +1346,11 @@ class TicketOpenView(discord.ui.View):
             )
             return
         except discord.HTTPException:
-            logger.exception(f"สร้างห้องทิกเก็ตไม่สำเร็จสำหรับ {interaction.user}")
+            logger.exception(f"Failed to create ticket channel for {interaction.user}")
             await interaction.followup.send(
                 embed=base_embed(
-                    "ผิดพลาด",
-                    "❌ สร้างห้องทิกเก็ตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+                    L(guild_id, "ticket_create_failed_title"),
+                    L(guild_id, "ticket_create_failed_desc"),
                     color=Theme.DANGER,
                     guild=guild,
                 ),
@@ -746,19 +1359,15 @@ class TicketOpenView(discord.ui.View):
             return
 
         embed = base_embed(
-            "🎫 ทิกเก็ตของคุณ",
-            (
-                f"สวัสดี {interaction.user.mention} ทีมงานจะเข้ามาช่วยเหลือคุณเร็ว ๆ นี้\n"
-                f"{Theme.DIVIDER}\n"
-                "กรุณาอธิบายปัญหาหรือคำขอของคุณด้านล่าง ทีมงานจะรีบตอบกลับโดยเร็วที่สุด 💬"
-            ),
+            L(guild_id, "ticket_channel_title"),
+            L(guild_id, "ticket_channel_desc", member=interaction.user.mention, divider=Theme.DIVIDER),
             color=Theme.TICKET,
             guild=guild,
         )
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
         if support_role:
-            embed.add_field(name="👥 ทีมงานที่ดูแล", value=support_role.mention, inline=True)
-        embed.add_field(name="👤 เปิดโดย", value=interaction.user.mention, inline=True)
+            embed.add_field(name=L(guild_id, "ticket_support_team_field"), value=support_role.mention, inline=True)
+        embed.add_field(name=L(guild_id, "ticket_opened_by_field"), value=interaction.user.mention, inline=True)
 
         await ticket_channel.send(
             content=support_role.mention if support_role else None,
@@ -767,8 +1376,8 @@ class TicketOpenView(discord.ui.View):
         )
         await interaction.followup.send(
             embed=base_embed(
-                "เปิดทิกเก็ตสำเร็จ ✅",
-                f"เปิดทิกเก็ตแล้วที่ {ticket_channel.mention}",
+                L(guild_id, "ticket_created_title"),
+                L(guild_id, "ticket_created_desc", channel=ticket_channel.mention),
                 color=Theme.SUCCESS,
                 guild=guild,
             ),
@@ -778,18 +1387,18 @@ class TicketOpenView(discord.ui.View):
 
 class TicketCloseView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # ปุ่มถาวร
+        super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="ปิดทิกเก็ต",
+        label="Close ticket",
         style=discord.ButtonStyle.danger,
         emoji="🔒",
         custom_id="bobbot_ticket_close",
     )
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = interaction.channel
-        guild_id = str(interaction.guild.id)
-        conf = ticket_config.get(guild_id, {})
+        guild_id = interaction.guild.id
+        conf = ticket_config.get(str(guild_id), {})
         support_role_id = conf.get("support_role_id")
 
         is_owner = False
@@ -807,30 +1416,34 @@ class TicketCloseView(discord.ui.View):
 
         if not can_close:
             await interaction.response.send_message(
-                embed=base_embed("ไม่มีสิทธิ์", "❌ คุณไม่มีสิทธิ์ปิดทิกเก็ตนี้", color=Theme.DANGER, guild=interaction.guild),
+                embed=base_embed(
+                    L(guild_id, "ticket_no_permission_title"),
+                    L(guild_id, "ticket_no_permission_desc"),
+                    color=Theme.DANGER,
+                    guild=interaction.guild,
+                ),
                 ephemeral=True,
             )
             return
 
         await interaction.response.send_message(
             embed=base_embed(
-                "🔒 กำลังปิดทิกเก็ต",
-                f"ห้องนี้จะถูกลบใน 5 วินาที โดย {interaction.user.mention} แล้วเจอกันใหม่ {E('fun_wink', '👋')}",
+                L(guild_id, "ticket_closing_title"),
+                L(guild_id, "ticket_closing_desc", member=interaction.user.mention, wave=E("fun_wink", "👋")),
                 color=Theme.WARNING,
                 guild=interaction.guild,
             )
         )
-        logger.info(f"ทิกเก็ต {channel.name} ถูกปิดโดย {interaction.user}")
+        logger.info(f"Ticket {channel.name} closed by {interaction.user}")
         await discord.utils.sleep_until(datetime.datetime.now(timezone.utc) + timedelta(seconds=5))
         try:
-            await channel.delete(reason=f"ปิดทิกเก็ตโดย {interaction.user}")
+            await channel.delete(reason=f"Ticket closed by {interaction.user}")
         except discord.NotFound:
             pass
 
 
 # =========================================================
-# ระบบแผงแจกไฟล์/เทมเพลต (Script/File Hub Panel)
-# — ผู้ใช้เลือกรายการจาก dropdown แล้วบอทจะส่งไฟล์/ข้อความเข้า DM ให้อัตโนมัติ
+# Script/File hub panel
 # =========================================================
 class ScriptHubSelect(discord.ui.Select):
     def __init__(self, guild_id: int, items: list):
@@ -841,12 +1454,12 @@ class ScriptHubSelect(discord.ui.Select):
                 value=item["label"],
                 emoji="📎" if item.get("file_path") else "💬",
             )
-            for item in items[:25]  # Discord จำกัดตัวเลือกใน select ไว้ที่ 25
+            for item in items[:25]
         ]
         if not options:
-            options = [discord.SelectOption(label="ยังไม่มีรายการ", value="__empty__", emoji="📭")]
+            options = [discord.SelectOption(label=L(guild_id, "scripthub_no_items_option"), value="__empty__", emoji="📭")]
         super().__init__(
-            placeholder="✨ เลือกสคริปต์/ไฟล์ที่ต้องการ...",
+            placeholder=L(guild_id, "scripthub_select_placeholder"),
             min_values=1,
             max_values=1,
             options=options,
@@ -855,11 +1468,12 @@ class ScriptHubSelect(discord.ui.Select):
         self.guild_id = guild_id
 
     async def callback(self, interaction: discord.Interaction):
+        guild_id = self.guild_id
         if self.values[0] == "__empty__":
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ยังไม่มีรายการ",
-                    "❌ ยังไม่มีรายการให้เลือก กรุณาแจ้งแอดมินให้เพิ่มด้วย `/scripthub_additem`",
+                    L(guild_id, "scripthub_empty_title"),
+                    L(guild_id, "scripthub_empty_desc"),
                     color=Theme.WARNING,
                     guild=interaction.guild,
                 ),
@@ -867,15 +1481,15 @@ class ScriptHubSelect(discord.ui.Select):
             )
             return
 
-        conf = scripthub_config.get(str(self.guild_id), {})
+        conf = scripthub_config.get(str(guild_id), {})
         items = conf.get("items", [])
         chosen = next((i for i in items if i["label"] == self.values[0]), None)
 
         if not chosen:
             await interaction.response.send_message(
                 embed=base_embed(
-                    "ไม่พบรายการ",
-                    "❌ ไม่พบรายการนี้แล้ว (อาจถูกลบไป) กรุณากด Refresh Menu แล้วลองใหม่",
+                    L(guild_id, "scripthub_item_missing_title"),
+                    L(guild_id, "scripthub_item_missing_desc"),
                     color=Theme.DANGER,
                     guild=interaction.guild,
                 ),
@@ -891,12 +1505,12 @@ class ScriptHubSelect(discord.ui.Select):
             if file_path and os.path.exists(file_path):
                 files = [discord.File(file_path, filename=chosen.get("file_name") or os.path.basename(file_path))]
 
-            dm_content = chosen.get("content") or f"นี่คือไฟล์ **{chosen['label']}** ของคุณค่ะ"
+            dm_content = chosen.get("content") or L(guild_id, "scripthub_dm_default_content", label=chosen["label"])
             await interaction.user.send(content=dm_content, files=files)
             await interaction.followup.send(
                 embed=base_embed(
-                    "ส่งสำเร็จ ✅",
-                    f"ส่ง **{chosen['label']}** เข้า DM ให้แล้ว ตรวจสอบกล่องข้อความส่วนตัวได้เลยครับ 📬 {E('fun_clap', '👏')}",
+                    L(guild_id, "scripthub_sent_title"),
+                    L(guild_id, "scripthub_sent_desc", label=chosen["label"], clap=E("fun_clap", "👏")),
                     color=Theme.SUCCESS,
                     guild=interaction.guild,
                 ),
@@ -905,19 +1519,19 @@ class ScriptHubSelect(discord.ui.Select):
         except discord.Forbidden:
             await interaction.followup.send(
                 embed=base_embed(
-                    "ส่ง DM ไม่ได้",
-                    "❌ กรุณาเปิดรับข้อความส่วนตัวจากสมาชิกในเซิร์ฟเวอร์นี้ก่อน (ตั้งค่า Privacy Settings)",
+                    L(guild_id, "scripthub_dm_forbidden_title"),
+                    L(guild_id, "scripthub_dm_forbidden_desc"),
                     color=Theme.DANGER,
                     guild=interaction.guild,
                 ),
                 ephemeral=True,
             )
         except discord.HTTPException:
-            logger.exception(f"ส่งไฟล์ scripthub ไม่สำเร็จ: {chosen['label']}")
+            logger.exception(f"Failed to send scripthub file: {chosen['label']}")
             await interaction.followup.send(
                 embed=base_embed(
-                    "เกิดข้อผิดพลาด",
-                    "❌ เกิดข้อผิดพลาดระหว่างส่งไฟล์ กรุณาลองใหม่อีกครั้ง",
+                    L(guild_id, "scripthub_send_error_title"),
+                    L(guild_id, "scripthub_send_error_desc"),
                     color=Theme.DANGER,
                     guild=interaction.guild,
                 ),
@@ -928,7 +1542,7 @@ class ScriptHubSelect(discord.ui.Select):
 class ScriptHubRefreshButton(discord.ui.Button):
     def __init__(self, guild_id: int):
         super().__init__(
-            label="Refresh Menu",
+            label=L(guild_id, "scripthub_refresh_button"),
             style=discord.ButtonStyle.secondary,
             emoji="🔄",
             custom_id=f"scripthub_refresh_{guild_id}",
@@ -944,18 +1558,18 @@ class ScriptHubRefreshButton(discord.ui.Button):
 
 class ScriptHubView(discord.ui.View):
     def __init__(self, guild_id: int, items: list):
-        super().__init__(timeout=None)  # ปุ่ม/เมนูถาวร ใช้ได้ตลอดแม้บอทรีสตาร์ท
+        super().__init__(timeout=None)
         self.add_item(ScriptHubSelect(guild_id, items))
         self.add_item(ScriptHubRefreshButton(guild_id))
 
 
-def build_scripthub_embed(conf: dict) -> discord.Embed:
+def build_scripthub_embed(guild_id: int, conf: dict) -> discord.Embed:
+    title = conf.get("title") or L(guild_id, "scripthub_default_title")
+    description = conf.get("description") or L(guild_id, "scripthub_default_desc")
     embed = discord.Embed(
-        title=themify(f"📂 {conf.get('title') or 'SCRIPT HUB PANEL'}"),
+        title=themify(f"📂 {title}"),
         description=themify(
-            f"{conf.get('description') or 'เลือกสคริปต์ที่ต้องการจากเมนูด้านล่าง แล้วบอทจะส่งเข้า DM ให้ทันที'}\n"
-            f"{Theme.DIVIDER}\n"
-            "📥 **วิธีใช้:** กดที่เมนู ▾ เลือกรายการ รอรับข้อความทาง DM"
+            f"{description}\n{Theme.DIVIDER}\n{L(guild_id, 'scripthub_how_to_use')}"
         ),
         color=Theme.SCRIPTHUB,
         timestamp=datetime.datetime.now(timezone.utc),
@@ -965,87 +1579,105 @@ def build_scripthub_embed(conf: dict) -> discord.Embed:
     embed.set_thumbnail(url=bot.user.display_avatar.url if bot.user else None)
     items_count = len(conf.get("items", []))
     embed.set_footer(
-        text=f"✨ {bot.user.name if bot.user else 'BOB_BOT'} • {items_count} รายการพร้อมให้บริการ",
+        text=f"✨ {bot.user.name if bot.user else 'BOB_BOT'} • {L(guild_id, 'scripthub_items_ready_footer', count=items_count)}",
         icon_url=bot.user.display_avatar.url if bot.user else None,
     )
     return embed
 
 
+def build_rules_embeds(guild_id: int, conf: dict) -> list[discord.Embed]:
+    """Build one embed per language section, in the order they were added."""
+    sections = conf.get("sections", [])
+    if not sections:
+        return [
+            base_embed(
+                L(guild_id, "rules_placeholder_title"),
+                L(guild_id, "rules_placeholder_desc"),
+                color=Theme.PRIMARY,
+                guild=None,
+                timestamp=False,
+            )
+        ]
+    embeds = []
+    for idx, section in enumerate(sections):
+        color_value = section.get("color")
+        color = discord.Color(color_value) if color_value else Theme.RULES_PALETTE[idx % len(Theme.RULES_PALETTE)]
+        embed = discord.Embed(
+            title=f"[{section['code']}] {section['name']}",
+            description=section["content"],
+            color=color,
+        )
+        embeds.append(embed)
+    return embeds
+
+
 async def load_custom_emojis():
-    """โหลด Application Emoji ของบอทเข้า cache เพื่อให้ E()/themify() เรียกใช้ได้ทันที"""
     try:
         app_emojis = await bot.fetch_application_emojis()
         custom_emoji_cache.clear()
         custom_emoji_cache.update({emoji.name: emoji for emoji in app_emojis})
-        logger.info(f"โหลด custom emoji ของบอทแล้ว {len(custom_emoji_cache)} ตัว")
+        logger.info(f"Loaded {len(custom_emoji_cache)} custom emoji(s)")
     except discord.HTTPException:
-        logger.exception("โหลด custom emoji ของบอทไม่สำเร็จ (จะใช้ unicode emoji แทนไปก่อน)")
+        logger.exception("Failed to load custom emoji (falling back to unicode emoji)")
 
 
 @bot.event
 async def on_ready():
-    logger.info(f"เข้าสู่ระบบในชื่อ {bot.user} (ID: {bot.user.id})")
+    logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
 
-    # ทำงานหนัก (เรียก API จริง) แค่ครั้งเดียวต่อการรันโปรเซส กัน global rate limit
-    # ถ้า reconnect บ่อย ๆ (เช่น hosting ไม่เสถียร) จะไม่ยิง sync/emoji ซ้ำจนโดนบล็อก
     if not bot.startup_done:
         await load_custom_emojis()
         try:
             synced = await bot.tree.sync()
-            logger.info(f"ซิงค์ slash command แล้ว {len(synced)} คำสั่ง")
+            logger.info(f"Synced {len(synced)} slash command(s)")
         except discord.HTTPException:
             logger.exception(
-                "ซิงค์คำสั่งไม่สำเร็จ (อาจโดน rate limit ชั่วคราว) — คำสั่งเก่ายังใช้งานได้ปกติ จะลองใหม่ตอนรีสตาร์ทครั้งหน้า"
+                "Failed to sync commands (may be rate limited) — existing commands still work; will retry on next restart"
             )
         except Exception:
-            logger.exception("เกิดข้อผิดพลาดตอนซิงค์คำสั่ง")
+            logger.exception("Unexpected error while syncing commands")
         bot.startup_done = True
 
-    # ส่วนนี้เป็นแค่การลงทะเบียน view ใน local (ไม่เรียก API) ปลอดภัยที่จะทำซ้ำทุกครั้งที่ on_ready
     verify_view = VerifyView()
     ticket_open_view = TicketOpenView()
     ticket_close_view = TicketCloseView()
 
-    # แพตช์ emoji บนปุ่มถาวรให้เป็น custom emoji ของบอท (ถ้ามี) หลังจากโหลด cache แล้ว
     verify_view.verify_button.emoji = E("star", "⭐")
     ticket_open_view.open_ticket.emoji = E("ticket", "🎫")
     ticket_close_view.close_ticket.emoji = E("lock", "🔒")
 
-    bot.add_view(verify_view)  # ลงทะเบียนปุ่มถาวรใหม่ทุกครั้งที่บอทออนไลน์/รีสตาร์ท
+    bot.add_view(verify_view)
     bot.add_view(ticket_open_view)
     bot.add_view(ticket_close_view)
-    # ลงทะเบียนแผงแจกไฟล์/เทมเพลตของทุกเซิร์ฟเวอร์ที่เคยตั้งค่าไว้
     for guild_id_str, conf in scripthub_config.items():
         try:
             bot.add_view(ScriptHubView(int(guild_id_str), conf.get("items", [])))
         except (ValueError, TypeError):
-            logger.warning(f"ลงทะเบียนแผง scripthub ของ guild {guild_id_str} ไม่สำเร็จ")
+            logger.warning(f"Failed to register scripthub panel for guild {guild_id_str}")
 
-    # เปิดสถานะอัตโนมัติทุกครั้งที่บอทออนไลน์ (กันกรณีรีสตาร์ทแล้วลืมสั่งใหม่)
     if not update_status.is_running():
         update_status.start()
 
 
 @bot.event
 async def on_disconnect():
-    logger.warning("บอทหลุดการเชื่อมต่อกับ Discord (discord.py จะพยายามเชื่อมต่อใหม่อัตโนมัติ)")
+    logger.warning("Disconnected from Discord (discord.py will attempt to reconnect automatically)")
 
 
 @bot.event
 async def on_resumed():
-    logger.info("เชื่อมต่อกับ Discord กลับมาได้แล้ว")
+    logger.info("Reconnected to Discord")
 
 
 @bot.event
 async def on_message(message: discord.Message):
-    # ยังคงให้ command แบบ prefix (ถ้ามีในอนาคต) ทำงานได้ตามปกติ
     await bot.process_commands(message)
 
     if message.author.bot or not message.guild:
         return
 
-    guild_id = str(message.guild.id)
-    conf = ai_config.get(guild_id)
+    guild_id = message.guild.id
+    conf = ai_config.get(str(guild_id))
     if not conf or not conf.get("enabled"):
         return
 
@@ -1053,7 +1685,6 @@ async def on_message(message: discord.Message):
     target_channel_id = conf.get("channel_id")
     in_target_channel = target_channel_id is not None and message.channel.id == int(target_channel_id)
 
-    # ตอบเมื่อ: ถูกแท็ก @บอท ในห้องไหนก็ได้ของกิลด์นี้ หรืออยู่ในห้องที่ตั้งค่าไว้ให้ AI ตอบทุกข้อความ
     if not bot_mentioned and not in_target_channel:
         return
 
@@ -1064,40 +1695,27 @@ async def on_message(message: discord.Message):
     if not user_text:
         return
 
-    persona = conf.get("persona") or DEFAULT_AI_PERSONA
+    persona = conf.get("persona") or L(guild_id, "ai_default_persona")
 
     try:
         async with message.channel.typing():
             reply_text = await generate_ai_reply(
-                message.channel.id, persona, message.author.display_name, user_text
+                guild_id, message.channel.id, persona, message.author.display_name, user_text
             )
     except discord.Forbidden:
-        return  # บอทไม่มีสิทธิ์พิมพ์/ส่งข้อความในห้องนี้
+        return
 
     for chunk in split_for_discord(reply_text):
         try:
             await message.reply(chunk, mention_author=False)
         except discord.HTTPException:
-            logger.exception("ส่งคำตอบ AI ไม่สำเร็จ")
+            logger.exception("Failed to send AI reply")
             break
 
 
 # =========================================================
-# ระบบอัปเดตสถานะบอท (จำนวนเซิร์ฟ/สมาชิก/เวลา)
+# Status rotation (server/member count & time)
 # =========================================================
-DAYS_TH = {
-    "Monday": "จันทร์",
-    "Tuesday": "อังคาร",
-    "Wednesday": "พุธ",
-    "Thursday": "พฤหัสบดี",
-    "Friday": "ศุกร์",
-    "Saturday": "เสาร์",
-    "Sunday": "อาทิตย์",
-}
-
-
-# แก้จาก 5 วินาที เป็น 20 วินาที: Discord จำกัดความถี่การอัปเดต presence
-# การอัปเดตถี่เกินไปเสี่ยงโดน rate limit หรือหลุดการเชื่อมต่อ
 @tasks.loop(seconds=20)
 async def update_status():
     try:
@@ -1105,20 +1723,18 @@ async def update_status():
         total_members = sum(g.member_count or 0 for g in bot.guilds)
 
         now = datetime.datetime.now(timezone(timedelta(hours=7)))
-        day_eng = now.strftime("%A")
-        day_th = DAYS_TH.get(day_eng, day_eng)
         time_now = now.strftime("%H:%M:%S")
+        day_name = now.strftime("%A")
 
         status_text = (
-            f"{guild_count}เซิร์ฟ·⌒ﾞ🍇 {total_members}คนᔕ:･ﾟ🍃 "
-            f"วัน {day_th}:･ﾟ☀️ เวลา:･ﾟ({time_now})·⌒ﾞ📆"
+            f"{guild_count} servers ·⌒ﾞ🍇 {total_members} members ᔕ:･ﾟ🍃 "
+            f"{day_name} :･ﾟ☀️ ({time_now})·⌒ﾞ📆"
         )
 
         activity = discord.Activity(type=discord.ActivityType.watching, name=status_text)
         await bot.change_presence(activity=activity)
     except Exception:
-        # กันไม่ให้ loop ตายทั้งชุดถ้ามี error ชั่วคราวระหว่างอัปเดตสถานะ
-        logger.exception("เกิดข้อผิดพลาดระหว่างอัปเดตสถานะ")
+        logger.exception("Error while updating bot status")
 
 
 @update_status.before_loop
@@ -1131,15 +1747,32 @@ async def update_status_error(error):
     logger.exception(f"update_status loop error: {error}")
 
 
-@bot.tree.command(name="setupverify", description="ตั้งค่าและส่งข้อความระบบยืนยันตัวตน (กดปุ่มรับยศ)")
-@app_commands.describe(role="ยศที่จะมอบให้เมื่อกดยืนยันตัวตน")
+@bot.tree.command(name="settings", description="Choose the language the bot uses to reply on this server")
+async def settings(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    current_lang_name = AVAILABLE_LANGUAGES[get_guild_language(guild_id)]["name"]
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "settings_title"),
+            L(guild_id, "settings_desc", current=current_lang_name),
+            color=Theme.PRIMARY,
+            guild=interaction.guild,
+        ),
+        view=SettingsView(guild_id),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="setupverify", description="Set up and send the verification message (button gives a role)")
+@app_commands.describe(role="The role to grant when someone verifies")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def setupverify(interaction: discord.Interaction, role: discord.Role):
+    guild_id = interaction.guild.id
     if role >= interaction.guild.me.top_role:
         await interaction.response.send_message(
             embed=base_embed(
-                "ยศสูงเกินไป",
-                "❌ ยศที่เลือกอยู่สูงกว่าหรือเท่ากับยศของบอท กรุณาเลื่อนยศบอทให้สูงกว่ายศนี้ก่อน",
+                L(guild_id, "verify_role_too_high_title"),
+                L(guild_id, "verify_role_too_high_desc"),
                 color=Theme.DANGER,
                 guild=interaction.guild,
             ),
@@ -1147,16 +1780,12 @@ async def setupverify(interaction: discord.Interaction, role: discord.Role):
         )
         return
 
-    verify_config[str(interaction.guild.id)] = role.id
+    verify_config[str(guild_id)] = role.id
     save_verify_config(verify_config)
 
     embed = base_embed(
-        "⭐ ยืนยันตัวตนเพื่อเข้าใช้งานเซิร์ฟเวอร์",
-        (
-            f"คลิกปุ่ม **ยืนยันตัวตน** ด้านล่างเพื่อรับยศ {role.mention}\n"
-            f"{Theme.DIVIDER}\n"
-            "การยืนยันตัวตนจะช่วยปลดล็อกห้องต่าง ๆ ภายในเซิร์ฟเวอร์ให้คุณ ✅"
-        ),
+        L(guild_id, "verify_panel_title"),
+        L(guild_id, "verify_panel_desc", role=role.mention, divider=Theme.DIVIDER),
         color=Theme.PRIMARY,
         guild=interaction.guild,
     )
@@ -1164,15 +1793,17 @@ async def setupverify(interaction: discord.Interaction, role: discord.Role):
         embed.set_thumbnail(url=interaction.guild.icon.url)
 
     await interaction.response.send_message(
-        embed=base_embed("ตั้งค่าสำเร็จ ✅", "กำลังส่งข้อความยืนยันตัวตน...", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(
+            L(guild_id, "verify_setup_success_title"),
+            L(guild_id, "verify_setup_sending"),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
         ephemeral=True,
     )
     await interaction.channel.send(embed=embed, view=VerifyView())
 
 
-# =========================================================
-# ยูทิลิตี้: ตรวจสอบสิทธิ์
-# =========================================================
 def is_mod():
     async def predicate(interaction: discord.Interaction) -> bool:
         return interaction.user.guild_permissions.manage_messages
@@ -1180,19 +1811,20 @@ def is_mod():
 
 
 # =========================================================
-# หมวด: Moderation (ดูแลสมาชิก/ลบข้อความ)
+# Moderation
 # =========================================================
 
-@bot.tree.command(name="clear", description="ลบข้อความในห้องนี้ตามจำนวนที่กำหนด")
-@app_commands.describe(amount="จำนวนข้อความที่จะลบ (1-100)")
+@bot.tree.command(name="clear", description="Delete a number of messages in this channel")
+@app_commands.describe(amount="Number of messages to delete (1-100)")
 @is_mod()
 async def clear(interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100]):
+    guild_id = interaction.guild.id
     await interaction.response.defer(ephemeral=True)
     deleted = await interaction.channel.purge(limit=amount)
     await interaction.followup.send(
         embed=base_embed(
-            "ลบข้อความสำเร็จ 🧹",
-            f"ลบข้อความไปแล้ว **{len(deleted)}** ข้อความ สะอาดเอี่ยม {E('fun_clap', '👏')}",
+            L(guild_id, "clear_success_title"),
+            L(guild_id, "clear_success_desc", count=len(deleted), clap=E("fun_clap", "👏")),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -1200,130 +1832,171 @@ async def clear(interaction: discord.Interaction, amount: app_commands.Range[int
     )
 
 
-@bot.tree.command(name="warn", description="เตือนสมาชิก")
-@app_commands.describe(member="สมาชิกที่ต้องการเตือน", reason="เหตุผล")
+@bot.tree.command(name="warn", description="Warn a member")
+@app_commands.describe(member="The member to warn", reason="Reason")
 @is_mod()
-async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "ไม่ระบุเหตุผล"):
+async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    guild_id = interaction.guild.id
+    reason = reason or L(guild_id, "reason_not_specified")
     embed = base_embed(
-        "⚠️ คำเตือน",
-        f"{member.mention} ถูกเตือนโดย {interaction.user.mention}",
+        L(guild_id, "warn_title"),
+        L(guild_id, "warn_desc", member=member.mention, mod=interaction.user.mention),
         color=Theme.WARNING,
         guild=interaction.guild,
     )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="📄 เหตุผล", value=reason, inline=False)
+    embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
     await interaction.response.send_message(embed=embed)
     try:
         await member.send(
             embed=base_embed(
-                "คุณถูกเตือน ⚠️",
-                f"คุณถูกเตือนในเซิร์ฟเวอร์ **{interaction.guild.name}**",
+                L(guild_id, "warn_dm_title"),
+                L(guild_id, "warn_dm_desc", guild=interaction.guild.name),
                 color=Theme.WARNING,
                 guild=interaction.guild,
-            ).add_field(name="📄 เหตุผล", value=reason, inline=False)
+            ).add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
         )
     except discord.Forbidden:
         pass
 
 
-@bot.tree.command(name="kick", description="เตะสมาชิกออกจากเซิร์ฟเวอร์")
-@app_commands.describe(member="สมาชิกที่ต้องการเตะ", reason="เหตุผล")
+@bot.tree.command(name="kick", description="Kick a member from the server")
+@app_commands.describe(member="The member to kick", reason="Reason")
 @app_commands.checks.has_permissions(kick_members=True)
-async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "ไม่ระบุเหตุผล"):
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    guild_id = interaction.guild.id
+    reason = reason or L(guild_id, "reason_not_specified")
     try:
         await member.kick(reason=reason)
     except discord.Forbidden:
         await interaction.response.send_message(
-            embed=base_embed("ไม่มีสิทธิ์", "❌ บอทไม่มีสิทธิ์เตะสมาชิกคนนี้ (ตรวจสอบลำดับยศของบอท)", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(
+                L(guild_id, "kick_no_permission_title"),
+                L(guild_id, "kick_no_permission_desc"),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
             ephemeral=True,
         )
         return
-    embed = base_embed("👢 เตะสมาชิกออกแล้ว", f"{member.mention} ถูกเตะออกจากเซิร์ฟเวอร์", color=Theme.WARNING, guild=interaction.guild)
+    embed = base_embed(
+        L(guild_id, "kick_success_title"),
+        L(guild_id, "kick_success_desc", member=member.mention),
+        color=Theme.WARNING,
+        guild=interaction.guild,
+    )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="📄 เหตุผล", value=reason, inline=False)
+    embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="ban", description="แบนสมาชิกออกจากเซิร์ฟเวอร์")
-@app_commands.describe(member="สมาชิกที่ต้องการแบน", reason="เหตุผล")
+@bot.tree.command(name="ban", description="Ban a member from the server")
+@app_commands.describe(member="The member to ban", reason="Reason")
 @app_commands.checks.has_permissions(ban_members=True)
-async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "ไม่ระบุเหตุผล"):
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    guild_id = interaction.guild.id
+    reason = reason or L(guild_id, "reason_not_specified")
     try:
         await member.ban(reason=reason)
     except discord.Forbidden:
         await interaction.response.send_message(
-            embed=base_embed("ไม่มีสิทธิ์", "❌ บอทไม่มีสิทธิ์แบนสมาชิกคนนี้ (ตรวจสอบลำดับยศของบอท)", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(
+                L(guild_id, "ban_no_permission_title"),
+                L(guild_id, "ban_no_permission_desc"),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
             ephemeral=True,
         )
         return
-    embed = base_embed("🔨 แบนสมาชิกแล้ว", f"{member.mention} ถูกแบนออกจากเซิร์ฟเวอร์", color=Theme.DANGER, guild=interaction.guild)
+    embed = base_embed(
+        L(guild_id, "ban_success_title"),
+        L(guild_id, "ban_success_desc", member=member.mention),
+        color=Theme.DANGER,
+        guild=interaction.guild,
+    )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="📄 เหตุผล", value=reason, inline=False)
+    embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="timeout", description="ปิดปากสมาชิกชั่วคราว (timeout)")
-@app_commands.describe(member="สมาชิก", minutes="ระยะเวลา (นาที)", reason="เหตุผล")
+@bot.tree.command(name="timeout", description="Temporarily mute a member")
+@app_commands.describe(member="The member", minutes="Duration (minutes)", reason="Reason")
 @is_mod()
-async def timeout(interaction: discord.Interaction, member: discord.Member, minutes: app_commands.Range[int, 1, 10080], reason: str = "ไม่ระบุเหตุผล"):
+async def timeout(interaction: discord.Interaction, member: discord.Member, minutes: app_commands.Range[int, 1, 10080], reason: str = None):
+    guild_id = interaction.guild.id
+    reason = reason or L(guild_id, "reason_not_specified")
     duration = datetime.timedelta(minutes=minutes)
     try:
         await member.timeout(duration, reason=reason)
     except discord.Forbidden:
         await interaction.response.send_message(
-            embed=base_embed("ไม่มีสิทธิ์", "❌ บอทไม่มีสิทธิ์ timeout สมาชิกคนนี้ (ตรวจสอบลำดับยศของบอท)", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(
+                L(guild_id, "timeout_no_permission_title"),
+                L(guild_id, "timeout_no_permission_desc"),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
             ephemeral=True,
         )
         return
-    embed = base_embed("🔇 ปิดปากชั่วคราว", f"{member.mention} ถูกปิดปากเป็นเวลา **{minutes} นาที**", color=Theme.WARNING, guild=interaction.guild)
+    embed = base_embed(
+        L(guild_id, "timeout_success_title"),
+        L(guild_id, "timeout_success_desc", member=member.mention, minutes=minutes),
+        color=Theme.WARNING,
+        guild=interaction.guild,
+    )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="📄 เหตุผล", value=reason, inline=False)
+    embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
     await interaction.response.send_message(embed=embed)
 
 
 # =========================================================
-# หมวด: จัดการยศ/บทบาท (Role Management)
+# Role management
 # =========================================================
 
-@bot.tree.command(name="addrole", description="เพิ่มยศให้สมาชิก")
-@app_commands.describe(member="สมาชิก", role="ยศที่ต้องการเพิ่ม")
+@bot.tree.command(name="addrole", description="Add a role to a member")
+@app_commands.describe(member="Member", role="Role to add")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
+    guild_id = interaction.guild.id
     await member.add_roles(role)
     await interaction.response.send_message(
         embed=base_embed(
-            "เพิ่มยศสำเร็จ ✅",
-            f"เพิ่มยศ {role.mention} ให้ {member.mention} แล้ว {E('fun_thumbsup', '👍')}",
+            L(guild_id, "addrole_success_title"),
+            L(guild_id, "addrole_success_desc", role=role.mention, member=member.mention, thumbsup=E("fun_thumbsup", "👍")),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         )
     )
 
 
-@bot.tree.command(name="removerole", description="ลบยศออกจากสมาชิก")
-@app_commands.describe(member="สมาชิก", role="ยศที่ต้องการลบ")
+@bot.tree.command(name="removerole", description="Remove a role from a member")
+@app_commands.describe(member="Member", role="Role to remove")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def removerole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
+    guild_id = interaction.guild.id
     await member.remove_roles(role)
     await interaction.response.send_message(
         embed=base_embed(
-            "ลบยศสำเร็จ ➖",
-            f"ลบยศ {role.mention} ออกจาก {member.mention} แล้ว {E('fun_ohno', '😅')}",
+            L(guild_id, "removerole_success_title"),
+            L(guild_id, "removerole_success_desc", role=role.mention, member=member.mention, ohno=E("fun_ohno", "😅")),
             color=Theme.WARNING,
             guild=interaction.guild,
         )
     )
 
 
-@bot.tree.command(name="nick", description="เปลี่ยนชื่อเล่นของสมาชิก")
-@app_commands.describe(member="สมาชิก", new_nick="ชื่อเล่นใหม่")
+@bot.tree.command(name="nick", description="Change a member's nickname")
+@app_commands.describe(member="Member", new_nick="New nickname")
 @app_commands.checks.has_permissions(manage_nicknames=True)
 async def nick(interaction: discord.Interaction, member: discord.Member, new_nick: str):
+    guild_id = interaction.guild.id
     await member.edit(nick=new_nick)
     await interaction.response.send_message(
         embed=base_embed(
-            "เปลี่ยนชื่อเล่นสำเร็จ ✏️",
-            f"เปลี่ยนชื่อเล่นของ {member.mention} เป็น **{new_nick}** แล้ว {E('fun_laughter', '😂')}",
+            L(guild_id, "nick_success_title"),
+            L(guild_id, "nick_success_desc", member=member.mention, nick=new_nick, laughter=E("fun_laughter", "😂")),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         )
@@ -1331,47 +2004,47 @@ async def nick(interaction: discord.Interaction, member: discord.Member, new_nic
 
 
 # =========================================================
-# หมวด: ระบบรับยศด้วยรีแอค (Reaction Role Menu)
+# Reaction role menu
 # =========================================================
 
-@bot.tree.command(name="rolemenu_create", description="สร้างข้อความเมนูรับยศ (ยังไม่มีตัวเลือก ให้ใช้ /rolemenu_add ต่อ)")
-@app_commands.describe(title="หัวข้อของเมนู", description="คำอธิบายของเมนู")
+@bot.tree.command(name="rolemenu_create", description="Create a reaction role menu message (add options with /rolemenu_add)")
+@app_commands.describe(title="Menu title", description="Menu description")
 @app_commands.checks.has_permissions(manage_roles=True)
-async def rolemenu_create(interaction: discord.Interaction, title: str, description: str = "รีแอคอิโมจิด้านล่างเพื่อรับ/ถอดยศ"):
+async def rolemenu_create(interaction: discord.Interaction, title: str, description: str = "React with an emoji below to get/remove a role"):
+    guild_id = interaction.guild.id
     embed = base_embed(f"🎭 {title}", f"{description}\n{Theme.DIVIDER}", color=Theme.PRIMARY, guild=interaction.guild)
     if interaction.guild.icon:
         embed.set_thumbnail(url=interaction.guild.icon.url)
     await interaction.response.send_message(
-        embed=base_embed("กำลังสร้าง ✅", "กำลังสร้างเมนูรับยศ...", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(L(guild_id, "rolemenu_created_sending"), None, color=Theme.SUCCESS, guild=interaction.guild),
         ephemeral=True,
     )
     msg = await interaction.channel.send(embed=embed)
 
-    guild_id = str(interaction.guild.id)
-    reactionrole_config.setdefault(guild_id, {})[str(msg.id)] = {}
+    reactionrole_config.setdefault(str(guild_id), {})[str(msg.id)] = {}
     save_reactionrole_config(reactionrole_config)
 
     await interaction.edit_original_response(
-        content=f"✅ สร้างเมนูเรียบร้อย ใช้คำสั่ง `/rolemenu_add message_id:{msg.id}` เพื่อเพิ่มตัวเลือกยศ"
+        content=L(guild_id, "rolemenu_created_note", id=msg.id)
     )
 
 
-@bot.tree.command(name="rolemenu_add", description="เพิ่มตัวเลือก อิโมจิ+ยศ เข้าไปในเมนูรับยศ")
-@app_commands.describe(message_id="ID ของข้อความเมนู (จาก /rolemenu_create)", emoji="อิโมจิที่จะใช้ (พิมพ์หรือวางอิโมจิ)", role="ยศที่จะมอบเมื่อรีแอค")
+@bot.tree.command(name="rolemenu_add", description="Add an emoji+role option to a role menu")
+@app_commands.describe(message_id="Menu message ID (from /rolemenu_create)", emoji="Emoji to use (type or paste)", role="Role to grant on react")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def rolemenu_add(interaction: discord.Interaction, message_id: str, emoji: str, role: discord.Role):
+    guild_id = interaction.guild.id
     if role >= interaction.guild.me.top_role:
         await interaction.response.send_message(
-            embed=base_embed("ยศสูงเกินไป", "❌ ยศที่เลือกอยู่สูงกว่าหรือเท่ากับยศของบอท กรุณาเลื่อนยศบอทให้สูงกว่ายศนี้ก่อน", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "rolemenu_role_too_high_title"), L(guild_id, "rolemenu_role_too_high_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
 
-    guild_id = str(interaction.guild.id)
-    guild_conf = reactionrole_config.get(guild_id, {})
+    guild_conf = reactionrole_config.get(str(guild_id), {})
     if message_id not in guild_conf:
         await interaction.response.send_message(
-            embed=base_embed("ไม่พบเมนู", "❌ ไม่พบเมนูนี้ กรุณาสร้างด้วย `/rolemenu_create` ก่อน", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "rolemenu_not_found_title"), L(guild_id, "rolemenu_not_found_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1380,7 +2053,7 @@ async def rolemenu_add(interaction: discord.Interaction, message_id: str, emoji:
         target_msg = await interaction.channel.fetch_message(int(message_id))
     except (discord.NotFound, ValueError):
         await interaction.response.send_message(
-            embed=base_embed("ไม่พบข้อความ", "❌ ไม่พบข้อความนี้ในห้องนี้ กรุณาใช้คำสั่งในห้องเดียวกับที่สร้างเมนู", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "rolemenu_message_not_found_title"), L(guild_id, "rolemenu_message_not_found_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1389,7 +2062,7 @@ async def rolemenu_add(interaction: discord.Interaction, message_id: str, emoji:
         await target_msg.add_reaction(emoji)
     except discord.HTTPException:
         await interaction.response.send_message(
-            embed=base_embed("อิโมจิไม่ถูกต้อง", "❌ อิโมจิไม่ถูกต้อง หรือบอทใช้อิโมจินี้ไม่ได้", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "rolemenu_bad_emoji_title"), L(guild_id, "rolemenu_bad_emoji_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1402,22 +2075,27 @@ async def rolemenu_add(interaction: discord.Interaction, message_id: str, emoji:
     await target_msg.edit(embed=embed)
 
     await interaction.response.send_message(
-        embed=base_embed("เพิ่มตัวเลือกสำเร็จ ✅", f"เพิ่ม {emoji} → {role.mention} เข้าเมนูแล้ว", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(
+            L(guild_id, "rolemenu_option_added_title"),
+            L(guild_id, "rolemenu_option_added_desc", emoji=emoji, role=role.mention),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
         ephemeral=True,
     )
 
 
-@bot.tree.command(name="rolemenu_remove", description="ลบตัวเลือก อิโมจิ ออกจากเมนูรับยศ")
-@app_commands.describe(message_id="ID ของข้อความเมนู", emoji="อิโมจิที่จะลบออก")
+@bot.tree.command(name="rolemenu_remove", description="Remove an emoji option from a role menu")
+@app_commands.describe(message_id="Menu message ID", emoji="Emoji to remove")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def rolemenu_remove(interaction: discord.Interaction, message_id: str, emoji: str):
-    guild_id = str(interaction.guild.id)
-    guild_conf = reactionrole_config.get(guild_id, {})
+    guild_id = interaction.guild.id
+    guild_conf = reactionrole_config.get(str(guild_id), {})
     mapping = guild_conf.get(message_id)
 
     if not mapping or emoji not in mapping:
         await interaction.response.send_message(
-            embed=base_embed("ไม่พบตัวเลือก", "❌ ไม่พบตัวเลือกนี้ในเมนู", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "rolemenu_option_not_found_title"), L(guild_id, "rolemenu_option_not_found_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1432,13 +2110,18 @@ async def rolemenu_remove(interaction: discord.Interaction, message_id: str, emo
         embed.clear_fields()
         for e, rid in mapping.items():
             r = interaction.guild.get_role(rid)
-            embed.add_field(name=e, value=r.mention if r else "(ยศถูกลบ)", inline=True)
+            embed.add_field(name=e, value=r.mention if r else L(guild_id, "rolemenu_role_deleted"), inline=True)
         await target_msg.edit(embed=embed)
     except (discord.NotFound, ValueError, discord.HTTPException):
         pass
 
     await interaction.response.send_message(
-        embed=base_embed("ลบตัวเลือกสำเร็จ ✅", f"ลบ {emoji} ออกจากเมนูแล้ว", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(
+            L(guild_id, "rolemenu_option_removed_title"),
+            L(guild_id, "rolemenu_option_removed_desc", emoji=emoji),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
         ephemeral=True,
     )
 
@@ -1473,9 +2156,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         return
 
     try:
-        await member.add_roles(role, reason="รับยศผ่านเมนูรีแอค")
+        await member.add_roles(role, reason="Got role via reaction menu")
     except discord.Forbidden:
-        logger.warning(f"ไม่มีสิทธิ์มอบยศ {role} ให้ {member} ผ่านเมนูรีแอค")
+        logger.warning(f"No permission to grant role {role} to {member} via reaction menu")
 
 
 @bot.event
@@ -1508,33 +2191,29 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
         return
 
     try:
-        await member.remove_roles(role, reason="ถอดยศผ่านเมนูรีแอค")
+        await member.remove_roles(role, reason="Removed role via reaction menu")
     except discord.Forbidden:
-        logger.warning(f"ไม่มีสิทธิ์ถอดยศ {role} จาก {member} ผ่านเมนูรีแอค")
+        logger.warning(f"No permission to remove role {role} from {member} via reaction menu")
 
 
 # =========================================================
-# หมวด: ระบบทิกเก็ต (Ticket System) — คำสั่งตั้งค่า
+# Ticket system — setup commands
 # =========================================================
 
-@bot.tree.command(name="setupticket", description="ตั้งค่าและส่งข้อความระบบเปิดทิกเก็ต")
-@app_commands.describe(category="หมวดหมู่ที่จะสร้างห้องทิกเก็ต", support_role="ยศทีมงานที่จะเห็นทิกเก็ต (ไม่ใส่ก็ได้)")
+@bot.tree.command(name="setupticket", description="Set up and send the ticket-opening message")
+@app_commands.describe(category="The category tickets will be created under", support_role="Support role that can see tickets (optional)")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def setupticket(interaction: discord.Interaction, category: discord.CategoryChannel, support_role: discord.Role = None):
-    guild_id = str(interaction.guild.id)
-    ticket_config[guild_id] = {
+    guild_id = interaction.guild.id
+    ticket_config[str(guild_id)] = {
         "category_id": category.id,
         "support_role_id": support_role.id if support_role else None,
     }
     save_ticket_config(ticket_config)
 
     embed = base_embed(
-        "🎫 ติดต่อทีมงาน",
-        (
-            "กดปุ่มด้านล่างเพื่อเปิดทิกเก็ตส่วนตัวสำหรับติดต่อทีมงาน\n"
-            f"{Theme.DIVIDER}\n"
-            "ทีมงานจะเข้ามาช่วยเหลือคุณโดยเร็วที่สุด 💬"
-        ),
+        L(guild_id, "ticket_panel_title"),
+        L(guild_id, "ticket_panel_desc", divider=Theme.DIVIDER),
         color=Theme.TICKET,
         guild=interaction.guild,
     )
@@ -1542,21 +2221,26 @@ async def setupticket(interaction: discord.Interaction, category: discord.Catego
         embed.set_thumbnail(url=interaction.guild.icon.url)
 
     await interaction.response.send_message(
-        embed=base_embed("ตั้งค่าสำเร็จ ✅", "กำลังส่งข้อความระบบทิกเก็ต...", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(
+            L(guild_id, "ticket_setup_success_title"),
+            L(guild_id, "ticket_setup_sending"),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
         ephemeral=True,
     )
     await interaction.channel.send(embed=embed, view=TicketOpenView())
 
 
-@bot.tree.command(name="closeticket", description="ปิดทิกเก็ตปัจจุบัน (ใช้ในห้องทิกเก็ตเท่านั้น)")
+@bot.tree.command(name="closeticket", description="Close the current ticket (use inside a ticket channel only)")
 async def closeticket(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
     channel = interaction.channel
-    guild_id = str(interaction.guild.id)
-    conf = ticket_config.get(guild_id, {})
+    conf = ticket_config.get(str(guild_id), {})
 
     if not channel.topic or "ticket_owner_id:" not in channel.topic:
         await interaction.response.send_message(
-            embed=base_embed("ไม่ใช่ห้องทิกเก็ต", "❌ ห้องนี้ไม่ใช่ห้องทิกเก็ต", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "ticket_not_a_ticket_title"), L(guild_id, "ticket_not_a_ticket_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1570,64 +2254,69 @@ async def closeticket(interaction: discord.Interaction):
 
     if not can_close:
         await interaction.response.send_message(
-            embed=base_embed("ไม่มีสิทธิ์", "❌ คุณไม่มีสิทธิ์ปิดทิกเก็ตนี้", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "ticket_no_permission_title"), L(guild_id, "ticket_no_permission_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
 
     await interaction.response.send_message(
-        embed=base_embed("🔒 กำลังปิดทิกเก็ต", f"ห้องนี้จะถูกลบใน 5 วินาที โดย {interaction.user.mention}", color=Theme.WARNING, guild=interaction.guild)
+        embed=base_embed(
+            L(guild_id, "ticket_closing_title"),
+            L(guild_id, "ticket_closing_desc_simple", member=interaction.user.mention),
+            color=Theme.WARNING,
+            guild=interaction.guild,
+        )
     )
     await discord.utils.sleep_until(datetime.datetime.now(timezone.utc) + timedelta(seconds=5))
     try:
-        await channel.delete(reason=f"ปิดทิกเก็ตโดย {interaction.user}")
+        await channel.delete(reason=f"Ticket closed by {interaction.user}")
     except discord.NotFound:
         pass
 
 
 # =========================================================
-# หมวด: แผงแจกไฟล์/เทมเพลต (Script/File Hub Panel)
+# Script/File hub panel — commands
 # =========================================================
 
-@bot.tree.command(name="scripthub_setup", description="สร้าง/อัปเดตแผงแจกไฟล์-เทมเพลต (มีเมนู dropdown ให้เลือก)")
+@bot.tree.command(name="scripthub_setup", description="Create/update the file-sharing panel (has a dropdown menu)")
 @app_commands.describe(
-    title="หัวข้อของแผง เช่น SCRIPT HUB PANEL",
-    description="คำอธิบายใต้หัวข้อ",
-    image_url="URL รูปภาพประกอบ (ไม่ใส่ก็ได้)",
+    title="Panel title, e.g. SCRIPT HUB PANEL",
+    description="Description shown under the title",
+    image_url="Image URL (optional)",
 )
 @app_commands.checks.has_permissions(manage_guild=True)
 async def scripthub_setup(
     interaction: discord.Interaction, title: str, description: str, image_url: str = None
 ):
-    guild_id = str(interaction.guild.id)
-    conf = scripthub_config.get(guild_id, {"items": []})
+    guild_id = interaction.guild.id
+    conf = scripthub_config.get(str(guild_id), {"items": []})
     conf["title"] = title
     conf["description"] = description
     conf["image_url"] = image_url
 
-    embed = build_scripthub_embed(conf)
-    view = ScriptHubView(interaction.guild.id, conf.get("items", []))
+    embed = build_scripthub_embed(guild_id, conf)
+    view = ScriptHubView(guild_id, conf.get("items", []))
 
     await interaction.response.send_message(
-        embed=base_embed("กำลังสร้างแผง ✅", "กำลังสร้างแผงแจกไฟล์...", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(L(guild_id, "scripthub_creating_title"), L(guild_id, "scripthub_creating_desc"), color=Theme.SUCCESS, guild=interaction.guild),
         ephemeral=True,
     )
     msg = await interaction.channel.send(embed=embed, view=view)
 
     conf["channel_id"] = interaction.channel.id
     conf["message_id"] = msg.id
-    scripthub_config[guild_id] = conf
+    scripthub_config[str(guild_id)] = conf
     save_scripthub_config(scripthub_config)
 
-    await interaction.edit_original_response(content="✅ สร้างแผงเรียบร้อย ใช้ /scripthub_additem เพื่อเพิ่มรายการต่อได้เลย")
+    await interaction.edit_original_response(content=L(guild_id, "scripthub_setup_done"))
 
 
-@bot.tree.command(name="scripthub_additem", description="เพิ่มรายการไฟล์/เทมเพลตเข้าแผง (แนบไฟล์ หรือใส่ข้อความก็ได้)")
+@bot.tree.command(name="scripthub_additem", description="Add a file/template item to the panel (attach a file, or use a text message)")
 @app_commands.describe(
-    label="ชื่อรายการที่จะแสดงในเมนู (สั้น ๆ ไม่เกิน 100 ตัวอักษร)",
-    description="คำอธิบายสั้น ๆ ของรายการ (แสดงในเมนู)",
-    content="ข้อความที่จะแนบไปกับ DM (ไม่ใส่ก็ได้ ถ้าแนบไฟล์)",
-    file="ไฟล์ที่จะส่งให้ผู้ใช้ (ไม่ใส่ก็ได้ ถ้ามีแค่ข้อความ)",
+    label="Item name shown in the menu (short, max 100 chars)",
+    description="Short description of the item (shown in the menu)",
+    content="Text to include with the DM (optional if a file is attached)",
+    file="File to send to the user (optional if only text is used)",
 )
 @app_commands.checks.has_permissions(manage_guild=True)
 async def scripthub_additem(
@@ -1637,18 +2326,18 @@ async def scripthub_additem(
     content: str = None,
     file: discord.Attachment = None,
 ):
+    guild_id = interaction.guild.id
     if not content and not file:
         await interaction.response.send_message(
-            embed=base_embed("ข้อมูลไม่ครบ", "❌ ต้องใส่อย่างน้อยหนึ่งอย่าง: ข้อความ (content) หรือไฟล์แนบ (file)", color=Theme.WARNING, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_missing_data_title"), L(guild_id, "scripthub_missing_data_desc"), color=Theme.WARNING, guild=interaction.guild),
             ephemeral=True,
         )
         return
 
-    guild_id = str(interaction.guild.id)
-    conf = scripthub_config.get(guild_id)
+    conf = scripthub_config.get(str(guild_id))
     if not conf:
         await interaction.response.send_message(
-            embed=base_embed("ยังไม่ได้สร้างแผง", "❌ ยังไม่ได้สร้างแผงในเซิร์ฟเวอร์นี้ กรุณาใช้ `/scripthub_setup` ก่อน", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_not_setup_title"), L(guild_id, "scripthub_not_setup_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1656,13 +2345,13 @@ async def scripthub_additem(
     items = conf.setdefault("items", [])
     if any(i["label"] == label for i in items):
         await interaction.response.send_message(
-            embed=base_embed("ชื่อซ้ำ", "❌ มีรายการชื่อนี้อยู่แล้ว กรุณาใช้ชื่ออื่น", color=Theme.WARNING, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_duplicate_title"), L(guild_id, "scripthub_duplicate_desc"), color=Theme.WARNING, guild=interaction.guild),
             ephemeral=True,
         )
         return
     if len(items) >= 25:
         await interaction.response.send_message(
-            embed=base_embed("เต็มแล้ว", "❌ แผงนี้มีรายการครบ 25 แล้ว (ข้อจำกัดของ Discord)", color=Theme.WARNING, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_full_title"), L(guild_id, "scripthub_full_desc"), color=Theme.WARNING, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1672,9 +2361,8 @@ async def scripthub_additem(
     file_path = None
     file_name = None
     if file:
-        guild_dir = os.path.join(SCRIPTHUB_FILES_DIR, guild_id)
+        guild_dir = os.path.join(SCRIPTHUB_FILES_DIR, str(guild_id))
         os.makedirs(guild_dir, exist_ok=True)
-        # sanitize ทั้ง label และชื่อไฟล์ก่อนประกอบเป็น path จริง กัน path traversal
         safe_label = safe_filename_part(label, fallback="item")
         safe_name = safe_filename_part(file.filename, fallback="file")
         file_path = os.path.join(guild_dir, f"{safe_label}_{safe_name}")
@@ -1692,33 +2380,37 @@ async def scripthub_additem(
     )
     save_scripthub_config(scripthub_config)
 
-    # อัปเดตแผงที่แสดงอยู่จริง (ถ้ามี) ให้เมนูมีตัวเลือกใหม่ทันที
     updated_live = False
     if conf.get("channel_id") and conf.get("message_id"):
         try:
             channel = interaction.guild.get_channel(int(conf["channel_id"]))
             msg = await channel.fetch_message(int(conf["message_id"]))
-            await msg.edit(embed=build_scripthub_embed(conf), view=ScriptHubView(interaction.guild.id, items))
+            await msg.edit(embed=build_scripthub_embed(guild_id, conf), view=ScriptHubView(guild_id, items))
             updated_live = True
         except (discord.NotFound, discord.Forbidden, AttributeError):
             pass
 
-    note = "และอัปเดตแผงที่แสดงอยู่ให้แล้ว" if updated_live else "(หาแผงที่แสดงอยู่ไม่เจอ ลองกด Refresh Menu บนแผงเอง)"
+    note = L(guild_id, "scripthub_note_updated") if updated_live else L(guild_id, "scripthub_note_not_found")
     await interaction.followup.send(
-        embed=base_embed("เพิ่มรายการสำเร็จ ✅", f"เพิ่มรายการ **{label}** เรียบร้อย {note}", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(
+            L(guild_id, "scripthub_item_added_title"),
+            L(guild_id, "scripthub_item_added_desc", label=label, note=note),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
         ephemeral=True,
     )
 
 
-@bot.tree.command(name="scripthub_removeitem", description="ลบรายการไฟล์/เทมเพลตออกจากแผง")
-@app_commands.describe(label="ชื่อรายการที่ต้องการลบ")
+@bot.tree.command(name="scripthub_removeitem", description="Remove a file/template item from the panel")
+@app_commands.describe(label="Name of the item to remove")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def scripthub_removeitem(interaction: discord.Interaction, label: str):
-    guild_id = str(interaction.guild.id)
-    conf = scripthub_config.get(guild_id)
+    guild_id = interaction.guild.id
+    conf = scripthub_config.get(str(guild_id))
     if not conf or not conf.get("items"):
         await interaction.response.send_message(
-            embed=base_embed("ไม่มีรายการ", "❌ ยังไม่มีรายการใด ๆ ในแผงนี้", color=Theme.WARNING, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_no_items_title"), L(guild_id, "scripthub_no_items_desc"), color=Theme.WARNING, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1727,7 +2419,7 @@ async def scripthub_removeitem(interaction: discord.Interaction, label: str):
     target = next((i for i in items if i["label"] == label), None)
     if not target:
         await interaction.response.send_message(
-            embed=base_embed("ไม่พบรายการ", "❌ ไม่พบรายการนี้", color=Theme.DANGER, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_item_not_found_title"), L(guild_id, "scripthub_item_not_found_desc"), color=Theme.DANGER, guild=interaction.guild),
             ephemeral=True,
         )
         return
@@ -1745,39 +2437,44 @@ async def scripthub_removeitem(interaction: discord.Interaction, label: str):
         try:
             channel = interaction.guild.get_channel(int(conf["channel_id"]))
             msg = await channel.fetch_message(int(conf["message_id"]))
-            await msg.edit(embed=build_scripthub_embed(conf), view=ScriptHubView(interaction.guild.id, items))
+            await msg.edit(embed=build_scripthub_embed(guild_id, conf), view=ScriptHubView(guild_id, items))
             updated_live = True
         except (discord.NotFound, discord.Forbidden, AttributeError):
             pass
 
-    note = "และอัปเดตแผงที่แสดงอยู่ให้แล้ว" if updated_live else "(ลองกด Refresh Menu บนแผงเอง)"
+    note = L(guild_id, "scripthub_note_removed_updated") if updated_live else L(guild_id, "scripthub_note_removed_not_found")
     await interaction.response.send_message(
-        embed=base_embed("ลบรายการสำเร็จ ✅", f"ลบรายการ **{label}** แล้ว {note}", color=Theme.SUCCESS, guild=interaction.guild),
+        embed=base_embed(
+            L(guild_id, "scripthub_removed_title"),
+            L(guild_id, "scripthub_removed_desc", label=label, note=note),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
         ephemeral=True,
     )
 
 
-@bot.tree.command(name="scripthub_listitems", description="ดูรายการไฟล์/เทมเพลตทั้งหมดในแผงของเซิร์ฟเวอร์นี้")
+@bot.tree.command(name="scripthub_listitems", description="List all file/template items in this server's panel")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def scripthub_listitems(interaction: discord.Interaction):
-    guild_id = str(interaction.guild.id)
-    conf = scripthub_config.get(guild_id)
+    guild_id = interaction.guild.id
+    conf = scripthub_config.get(str(guild_id))
     items = conf.get("items", []) if conf else []
 
     if not items:
         await interaction.response.send_message(
-            embed=base_embed("ว่างเปล่า", "📭 ยังไม่มีรายการในแผงนี้", color=Theme.WARNING, guild=interaction.guild),
+            embed=base_embed(L(guild_id, "scripthub_empty_list_title"), L(guild_id, "scripthub_empty_list_desc"), color=Theme.WARNING, guild=interaction.guild),
             ephemeral=True,
         )
         return
 
     lines = []
     for i in items:
-        kind = "📎 ไฟล์" if i.get("file_path") else "💬 ข้อความ"
+        kind = L(guild_id, "scripthub_kind_file") if i.get("file_path") else L(guild_id, "scripthub_kind_text")
         lines.append(f"**• {i['label']}** — {i.get('description') or '-'}  `{kind}`")
 
     embed = base_embed(
-        "📋 รายการในแผงแจกไฟล์/เทมเพลต",
+        L(guild_id, "scripthub_list_title"),
         "\n".join(lines),
         color=Theme.SCRIPTHUB,
         guild=interaction.guild,
@@ -1786,27 +2483,99 @@ async def scripthub_listitems(interaction: discord.Interaction):
 
 
 # =========================================================
-# หมวด: ระบบ AI ตอบแชท (Groq)
+# Server rules panel (multi-language)
 # =========================================================
 
-@bot.tree.command(name="ai_setup", description="ตั้งค่าระบบ AI ตอบแชทสำหรับเซิร์ฟเวอร์นี้")
+@bot.tree.command(name="rules_setup", description="Create/send the server rules panel in this channel")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def rules_setup(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    conf = rules_config.get(str(guild_id), {"sections": []})
+
+    embeds = build_rules_embeds(guild_id, conf)
+
+    await interaction.response.send_message(
+        embed=base_embed(L(guild_id, "rules_setup_success_title"), L(guild_id, "rules_setup_sending"), color=Theme.SUCCESS, guild=interaction.guild),
+        ephemeral=True,
+    )
+    msg = await interaction.channel.send(embeds=embeds)
+
+    conf["channel_id"] = interaction.channel.id
+    conf["message_id"] = msg.id
+    rules_config[str(guild_id)] = conf
+    save_rules_config(rules_config)
+
+    note = "" if conf.get("sections") else f"\n{L(guild_id, 'rules_setup_empty_note')}"
+    await interaction.edit_original_response(content=f"✅{note}")
+
+
+@bot.tree.command(name="rules_addsection", description="Add or update a language section in the rules panel")
 @app_commands.describe(
-    channel="ห้องที่ต้องการให้ AI ตอบทุกข้อความ (ไม่ใส่ = ตอบเฉพาะตอนถูกแท็ก @บอท เท่านั้น)",
+    lang_code="Short code for this language, e.g. EN, RU, TH",
+    lang_name="Full language name shown in the title, e.g. English",
+    content="The full rules text for this language (markdown supported)",
+    color_hex="Optional accent color as a hex code, e.g. FF0000 (defaults to a rotating palette)",
 )
 @app_commands.checks.has_permissions(manage_guild=True)
-async def ai_setup(interaction: discord.Interaction, channel: discord.TextChannel = None):
-    guild_id = str(interaction.guild.id)
-    conf = ai_config.get(guild_id, {"enabled": True, "channel_id": None, "persona": None})
-    conf["enabled"] = True
-    conf["channel_id"] = channel.id if channel else None
-    ai_config[guild_id] = conf
-    save_ai_config(ai_config)
+async def rules_addsection(
+    interaction: discord.Interaction,
+    lang_code: str,
+    lang_name: str,
+    content: str,
+    color_hex: str = None,
+):
+    guild_id = interaction.guild.id
+    conf = rules_config.get(str(guild_id))
+    if not conf:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "rules_not_setup_title"), L(guild_id, "rules_not_setup_desc"), color=Theme.DANGER, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
 
-    where = channel.mention if channel else "การแท็ก @บอท ในห้องไหนก็ได้ของเซิร์ฟเวอร์นี้"
+    sections = conf.setdefault("sections", [])
+    code_upper = lang_code.strip().upper()
+
+    color_value = None
+    if color_hex:
+        try:
+            color_value = int(color_hex.strip().lstrip("#"), 16)
+        except ValueError:
+            color_value = None
+
+    existing = next((s for s in sections if s["code"] == code_upper), None)
+    is_update = existing is not None
+
+    if not is_update and len(sections) >= 10:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "rules_too_many_title"), L(guild_id, "rules_too_many_desc", count=len(sections)), color=Theme.WARNING, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    section_data = {"code": code_upper, "name": lang_name, "content": content, "color": color_value}
+    if is_update:
+        existing.update(section_data)
+    else:
+        sections.append(section_data)
+    save_rules_config(rules_config)
+
+    updated_live = False
+    if conf.get("channel_id") and conf.get("message_id"):
+        try:
+            channel = interaction.guild.get_channel(int(conf["channel_id"]))
+            msg = await channel.fetch_message(int(conf["message_id"]))
+            await msg.edit(embeds=build_rules_embeds(guild_id, conf))
+            updated_live = True
+        except (discord.NotFound, discord.Forbidden, AttributeError):
+            pass
+
+    note = L(guild_id, "rules_note_live_updated") if updated_live else L(guild_id, "rules_note_live_missing")
+    desc_key = "rules_section_updated_desc" if is_update else "rules_section_added_desc"
     await interaction.response.send_message(
         embed=base_embed(
-            "ตั้งค่า AI สำเร็จ ✅",
-            f"เปิดใช้งานระบบ AI ตอบแชทแล้ว\nขอบเขตการตอบ: {where}",
+            L(guild_id, "rules_section_added_title"),
+            L(guild_id, desc_key, name=lang_name, code=code_upper, note=note),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -1814,21 +2583,109 @@ async def ai_setup(interaction: discord.Interaction, channel: discord.TextChanne
     )
 
 
-@bot.tree.command(name="ai_toggle", description="เปิด/ปิดระบบ AI ตอบแชทสำหรับเซิร์ฟเวอร์นี้")
-@app_commands.describe(enabled="เปิด (True) หรือ ปิด (False)")
+@bot.tree.command(name="rules_removesection", description="Remove a language section from the rules panel")
+@app_commands.describe(lang_code="The language code to remove, e.g. EN")
 @app_commands.checks.has_permissions(manage_guild=True)
-async def ai_toggle(interaction: discord.Interaction, enabled: bool):
-    guild_id = str(interaction.guild.id)
-    conf = ai_config.get(guild_id, {"enabled": True, "channel_id": None, "persona": None})
-    conf["enabled"] = enabled
-    ai_config[guild_id] = conf
-    save_ai_config(ai_config)
+async def rules_removesection(interaction: discord.Interaction, lang_code: str):
+    guild_id = interaction.guild.id
+    conf = rules_config.get(str(guild_id))
+    code_upper = lang_code.strip().upper()
+    sections = conf.get("sections", []) if conf else []
+    target = next((s for s in sections if s["code"] == code_upper), None)
 
-    status_text = "เปิดใช้งาน ✅" if enabled else "ปิดใช้งาน ⛔"
+    if not target:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "rules_section_not_found_title"), L(guild_id, "rules_section_not_found_desc", code=code_upper), color=Theme.DANGER, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    sections.remove(target)
+    save_rules_config(rules_config)
+
+    updated_live = False
+    if conf.get("channel_id") and conf.get("message_id"):
+        try:
+            channel = interaction.guild.get_channel(int(conf["channel_id"]))
+            msg = await channel.fetch_message(int(conf["message_id"]))
+            await msg.edit(embeds=build_rules_embeds(guild_id, conf))
+            updated_live = True
+        except (discord.NotFound, discord.Forbidden, AttributeError):
+            pass
+
+    note = L(guild_id, "rules_note_live_updated") if updated_live else L(guild_id, "rules_note_live_missing")
     await interaction.response.send_message(
         embed=base_embed(
-            "อัปเดตแล้ว",
-            f"ระบบ AI ตอบแชท: {status_text}",
+            L(guild_id, "rules_section_removed_title"),
+            L(guild_id, "rules_section_removed_desc", code=code_upper, note=note),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="rules_listsections", description="List all language sections in the rules panel")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def rules_listsections(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    conf = rules_config.get(str(guild_id))
+    sections = conf.get("sections", []) if conf else []
+
+    if not sections:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "rules_no_sections_title"), L(guild_id, "rules_no_sections_desc"), color=Theme.WARNING, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    lines = [f"**[{s['code']}]** {s['name']}" for s in sections]
+    embed = base_embed(L(guild_id, "rules_list_title"), "\n".join(lines), color=Theme.PRIMARY, guild=interaction.guild)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+# =========================================================
+# AI chat system (Groq)
+# =========================================================
+
+@bot.tree.command(name="ai_setup", description="Set up the AI chat system for this server")
+@app_commands.describe(channel="Channel where the AI replies to every message (leave empty = only reply when @mentioned)")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def ai_setup(interaction: discord.Interaction, channel: discord.TextChannel = None):
+    guild_id = interaction.guild.id
+    conf = ai_config.get(str(guild_id), {"enabled": True, "channel_id": None, "persona": None})
+    conf["enabled"] = True
+    conf["channel_id"] = channel.id if channel else None
+    ai_config[str(guild_id)] = conf
+    save_ai_config(ai_config)
+
+    where = L(guild_id, "ai_setup_where_channel", channel=channel.mention) if channel else L(guild_id, "ai_setup_where_mention")
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "ai_setup_success_title"),
+            L(guild_id, "ai_setup_success_desc", where=where),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="ai_toggle", description="Turn the AI chat system on or off for this server")
+@app_commands.describe(enabled="On (True) or off (False)")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def ai_toggle(interaction: discord.Interaction, enabled: bool):
+    guild_id = interaction.guild.id
+    conf = ai_config.get(str(guild_id), {"enabled": True, "channel_id": None, "persona": None})
+    conf["enabled"] = enabled
+    ai_config[str(guild_id)] = conf
+    save_ai_config(ai_config)
+
+    status_text = L(guild_id, "ai_toggle_on") if enabled else L(guild_id, "ai_toggle_off")
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "ai_toggle_updated_title"),
+            L(guild_id, "ai_toggle_updated_desc", status=status_text),
             color=Theme.SUCCESS if enabled else Theme.WARNING,
             guild=interaction.guild,
         ),
@@ -1836,20 +2693,20 @@ async def ai_toggle(interaction: discord.Interaction, enabled: bool):
     )
 
 
-@bot.tree.command(name="ai_persona", description="ตั้งค่าบุคลิก/กติกาพื้นฐานของ AI (system prompt)")
-@app_commands.describe(persona="คำอธิบายบุคลิก/กติกาที่ต้องการให้ AI ยึดถือ")
+@bot.tree.command(name="ai_persona", description="Set the AI's persona / base rules (system prompt)")
+@app_commands.describe(persona="Description of the persona/rules the AI should follow")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def ai_persona(interaction: discord.Interaction, persona: str):
-    guild_id = str(interaction.guild.id)
-    conf = ai_config.get(guild_id, {"enabled": True, "channel_id": None, "persona": None})
+    guild_id = interaction.guild.id
+    conf = ai_config.get(str(guild_id), {"enabled": True, "channel_id": None, "persona": None})
     conf["persona"] = persona
-    ai_config[guild_id] = conf
+    ai_config[str(guild_id)] = conf
     save_ai_config(ai_config)
 
     await interaction.response.send_message(
         embed=base_embed(
-            "ตั้งค่าบุคลิกสำเร็จ ✅",
-            "อัปเดต persona ของ AI แล้ว ข้อความถัดไปจะใช้กติกาใหม่นี้",
+            L(guild_id, "ai_persona_success_title"),
+            L(guild_id, "ai_persona_success_desc"),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -1857,14 +2714,15 @@ async def ai_persona(interaction: discord.Interaction, persona: str):
     )
 
 
-@bot.tree.command(name="ai_reset", description="ล้างความจำการสนทนา AI ของห้องนี้")
+@bot.tree.command(name="ai_reset", description="Clear this channel's AI conversation memory")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def ai_reset(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
     ai_conversations.pop(interaction.channel.id, None)
     await interaction.response.send_message(
         embed=base_embed(
-            "ล้างความจำแล้ว ✅",
-            "AI จะเริ่มบทสนทนาใหม่ในห้องนี้ (ไม่มีประวัติเก่าติดมา)",
+            L(guild_id, "ai_reset_success_title"),
+            L(guild_id, "ai_reset_success_desc"),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -1873,11 +2731,12 @@ async def ai_reset(interaction: discord.Interaction):
 
 
 # =========================================================
-# หมวด: คำสั่งทั่วไป (General Commands)
+# General commands
 # =========================================================
 
-@bot.tree.command(name="ping", description="ตรวจสอบความหน่วงของบอท")
+@bot.tree.command(name="ping", description="Check the bot's latency")
 async def ping(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
     latency_ms = round(bot.latency * 1000)
     if latency_ms < 150:
         color, mood = Theme.SUCCESS, E("fun_perfect", "😎")
@@ -1885,50 +2744,53 @@ async def ping(interaction: discord.Interaction):
         color, mood = Theme.WARNING, E("fun_ok", "😐")
     else:
         color, mood = Theme.DANGER, E("fun_nervous", "😬")
-    embed = base_embed("🏓 Pong!", f"ความหน่วงของบอทตอนนี้อยู่ที่ **{latency_ms}ms** {mood}", color=color, guild=interaction.guild)
+    embed = base_embed(L(guild_id, "ping_pong_title"), L(guild_id, "ping_pong_desc", ms=latency_ms, mood=mood), color=color, guild=interaction.guild)
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="userinfo", description="ดูข้อมูลสมาชิก")
-@app_commands.describe(member="สมาชิกที่ต้องการดูข้อมูล (ไม่ใส่ = ตัวเอง)")
+@bot.tree.command(name="userinfo", description="View a member's info")
+@app_commands.describe(member="Member to look up (leave empty = yourself)")
 async def userinfo(interaction: discord.Interaction, member: discord.Member = None):
+    guild_id = interaction.guild.id
     member = member or interaction.user
-    embed = base_embed(f"👤 ข้อมูลของ {member.display_name}", color=Theme.INFO, guild=interaction.guild)
+    embed = base_embed(L(guild_id, "userinfo_title", member=member.display_name), color=Theme.INFO, guild=interaction.guild)
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.add_field(name="🏷️ ชื่อผู้ใช้", value=str(member), inline=True)
-    embed.add_field(name="🆔 ID", value=f"`{member.id}`", inline=True)
+    embed.add_field(name=L(guild_id, "userinfo_username_field"), value=str(member), inline=True)
+    embed.add_field(name=L(guild_id, "userinfo_id_field"), value=f"`{member.id}`", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
-    embed.add_field(name="📥 เข้าร่วมเซิร์ฟเวอร์เมื่อ", value=member.joined_at.strftime("%d/%m/%Y"), inline=True)
-    embed.add_field(name="🎂 สร้างบัญชีเมื่อ", value=member.created_at.strftime("%d/%m/%Y"), inline=True)
+    embed.add_field(name=L(guild_id, "userinfo_joined_field"), value=member.joined_at.strftime("%d/%m/%Y"), inline=True)
+    embed.add_field(name=L(guild_id, "userinfo_created_field"), value=member.created_at.strftime("%d/%m/%Y"), inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
     roles = [r.mention for r in member.roles if r.name != "@everyone"]
-    embed.add_field(name=f"🎭 ยศ ({len(roles)})", value=", ".join(roles) if roles else "ไม่มี", inline=False)
+    embed.add_field(name=L(guild_id, "userinfo_roles_field", count=len(roles)), value=", ".join(roles) if roles else L(guild_id, "userinfo_no_roles"), inline=False)
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="serverinfo", description="ดูข้อมูลเซิร์ฟเวอร์")
+@bot.tree.command(name="serverinfo", description="View server info")
 async def serverinfo(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
     guild = interaction.guild
     embed = base_embed(f"🏰 {guild.name}", color=Theme.PRIMARY, guild=guild)
     if guild.icon:
         embed.set_thumbnail(url=guild.icon.url)
     if guild.banner:
         embed.set_image(url=guild.banner.url)
-    embed.add_field(name="👑 เจ้าของ", value=guild.owner.mention if guild.owner else "-", inline=True)
-    embed.add_field(name="👥 จำนวนสมาชิก", value=f"{guild.member_count:,}", inline=True)
-    embed.add_field(name="🚀 บูสต์", value=f"ระดับ {guild.premium_tier} ({guild.premium_subscription_count} บูสต์)", inline=True)
-    embed.add_field(name="📅 สร้างเมื่อ", value=guild.created_at.strftime("%d/%m/%Y"), inline=True)
-    embed.add_field(name="💬 จำนวนห้อง", value=len(guild.channels), inline=True)
-    embed.add_field(name="🎭 จำนวนยศ", value=len(guild.roles), inline=True)
+    embed.add_field(name=L(guild_id, "serverinfo_owner_field"), value=guild.owner.mention if guild.owner else "-", inline=True)
+    embed.add_field(name=L(guild_id, "serverinfo_members_field"), value=f"{guild.member_count:,}", inline=True)
+    embed.add_field(name=L(guild_id, "serverinfo_boosts_field"), value=f"Level {guild.premium_tier} ({guild.premium_subscription_count})", inline=True)
+    embed.add_field(name=L(guild_id, "serverinfo_created_field"), value=guild.created_at.strftime("%d/%m/%Y"), inline=True)
+    embed.add_field(name=L(guild_id, "serverinfo_channels_field"), value=len(guild.channels), inline=True)
+    embed.add_field(name=L(guild_id, "serverinfo_roles_field"), value=len(guild.roles), inline=True)
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="poll", description="สร้างโพลแบบง่าย (โหวต 👍/👎)")
-@app_commands.describe(question="คำถามของโพล")
+@bot.tree.command(name="poll", description="Create a simple poll (👍/👎 vote)")
+@app_commands.describe(question="The poll question")
 async def poll(interaction: discord.Interaction, question: str):
+    guild_id = interaction.guild.id
     embed = base_embed(
-        "📊 โพลใหม่",
-        f"**{question}**\n{Theme.DIVIDER}\nกดรีแอคด้านล่างเพื่อโหวต {E('fun_gamer', '🎮')}",
+        L(guild_id, "poll_title"),
+        L(guild_id, "poll_desc", question=question, divider=Theme.DIVIDER, gamer=E("fun_gamer", "🎮")),
         color=Theme.INFO,
         guild=interaction.guild,
     )
@@ -1939,14 +2801,15 @@ async def poll(interaction: discord.Interaction, question: str):
     await msg.add_reaction("👎")
 
 
-@bot.tree.command(name="say", description="ให้บอทพูดข้อความแทนคุณ")
-@app_commands.describe(message="ข้อความที่ต้องการให้บอทพูด")
+@bot.tree.command(name="say", description="Have the bot say something on your behalf")
+@app_commands.describe(message="The message for the bot to say")
 @is_mod()
 async def say(interaction: discord.Interaction, message: str):
+    guild_id = interaction.guild.id
     await interaction.response.send_message(
         embed=base_embed(
-            "ส่งข้อความแล้ว ✅",
-            f"ข้อความถูกส่งเรียบร้อย {E('fun_wink', '😉')}",
+            L(guild_id, "say_sent_title"),
+            L(guild_id, "say_sent_desc", wink=E("fun_wink", "😉")),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -1955,17 +2818,18 @@ async def say(interaction: discord.Interaction, message: str):
     await interaction.channel.send(message)
 
 
-@bot.tree.command(name="user", description="ดูสถิติ Roblox/Rolimon's ของผู้ใช้ (RAP, Value, Collectibles, Value Rank)")
-@app_commands.describe(username="ชื่อผู้ใช้ Roblox หรือ User ID")
+@bot.tree.command(name="user", description="View a user's Roblox/Rolimon's stats (RAP, Value, Collectibles, Value Rank)")
+@app_commands.describe(username="Roblox username or User ID")
 async def user_lookup(interaction: discord.Interaction, username: str):
+    guild_id = interaction.guild.id
     await interaction.response.defer()
 
     roblox_user = await resolve_roblox_user(username)
     if not roblox_user:
         await interaction.followup.send(
             embed=base_embed(
-                "ไม่พบผู้ใช้",
-                f"❌ ไม่พบผู้ใช้ Roblox ชื่อ **{username}** กรุณาตรวจสอบชื่อ/ID อีกครั้ง",
+                L(guild_id, "user_lookup_not_found_title"),
+                L(guild_id, "user_lookup_not_found_desc", username=username),
                 color=Theme.DANGER,
                 guild=interaction.guild,
             )
@@ -1985,12 +2849,8 @@ async def user_lookup(interaction: discord.Interaction, username: str):
     if not player_info:
         await interaction.followup.send(
             embed=base_embed(
-                "ดึงข้อมูลไม่สำเร็จ",
-                (
-                    f"❌ ไม่สามารถดึงข้อมูลจาก Rolimon's สำหรับ **{display_name}** ได้ในตอนนี้\n"
-                    "สาเหตุที่เป็นไปได้: ผู้ใช้นี้ยังไม่เคยถูกเก็บสถิติใน Rolimon's หรือ API ถูกจำกัด/บล็อกการเข้าถึงชั่วคราว "
-                    "(Rolimon's เริ่มบล็อกการเรียก API นี้จากบางโฮสต์ตั้งแต่ต้นปี 2569)"
-                ),
+                L(guild_id, "user_lookup_failed_title"),
+                L(guild_id, "user_lookup_failed_desc", name=display_name),
                 color=Theme.WARNING,
                 guild=interaction.guild,
             )
@@ -2000,8 +2860,8 @@ async def user_lookup(interaction: discord.Interaction, username: str):
     rap = player_info.get("rap", 0) or 0
     value = player_info.get("value", 0) or 0
     rank = player_info.get("rank")
-    rank_text = f"#{rank:,}" if rank else "ไม่มีข้อมูล"
-    collectibles_text = f"{collectibles:,}" if collectibles is not None else "ไม่มีข้อมูล"
+    rank_text = f"#{rank:,}" if rank else L(guild_id, "user_lookup_no_data")
+    collectibles_text = f"{collectibles:,}" if collectibles is not None else L(guild_id, "user_lookup_no_data")
 
     embed = discord.Embed(color=Theme.ROLIMONS, timestamp=datetime.datetime.now(timezone.utc))
     embed.set_author(
@@ -2018,103 +2878,74 @@ async def user_lookup(interaction: discord.Interaction, username: str):
     embed.add_field(name="Value", value=f"{value:,}", inline=True)
     embed.add_field(name="Collectibles", value=collectibles_text, inline=True)
     embed.add_field(name="Value Rank", value=rank_text, inline=False)
-    embed.set_footer(text="Stats updated a few seconds ago, refresh stats by visiting the profile page")
+    embed.set_footer(text=L(guild_id, "user_lookup_footer"))
     if avatar_url:
         embed.set_thumbnail(url=avatar_url)
 
     await interaction.followup.send(embed=embed, view=RolimonsProfileView(user_id))
 
 
-@bot.tree.command(name="help", description="แสดงรายการคำสั่งทั้งหมด")
+@bot.tree.command(name="help", description="Show all available commands")
 async def help_command(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
     embed = base_embed(
-        "📖 คำสั่งทั้งหมดของ BOB_BOT",
-        f"รวมทุกคำสั่งที่ใช้งานได้ในเซิร์ฟเวอร์นี้\n{Theme.DIVIDER}",
+        L(guild_id, "help_title"),
+        f"{L(guild_id, 'help_desc')}\n{Theme.DIVIDER}",
         color=Theme.PRIMARY,
         guild=interaction.guild,
     )
     if bot.user:
         embed.set_thumbnail(url=bot.user.display_avatar.url)
+    embed.add_field(name=L(guild_id, "help_moderation"), value="`/clear` `/warn` `/kick` `/ban` `/timeout`", inline=False)
+    embed.add_field(name=L(guild_id, "help_roles"), value="`/addrole` `/removerole` `/nick`", inline=False)
+    embed.add_field(name=L(guild_id, "help_general"), value="`/ping` `/userinfo` `/serverinfo` `/poll` `/say`", inline=False)
+    embed.add_field(name=L(guild_id, "help_roblox"), value=L(guild_id, "help_roblox_desc"), inline=False)
+    embed.add_field(name=L(guild_id, "help_verify"), value=L(guild_id, "help_verify_desc"), inline=False)
     embed.add_field(
-        name="🛡️ Moderation",
-        value="`/clear` `/warn` `/kick` `/ban` `/timeout`",
-        inline=False
+        name=L(guild_id, "help_rolemenu"),
+        value="`/rolemenu_create`\n`/rolemenu_add`\n`/rolemenu_remove`",
+        inline=False,
     )
     embed.add_field(
-        name="🎭 จัดการยศ",
-        value="`/addrole` `/removerole` `/nick`",
-        inline=False
+        name=L(guild_id, "help_ticket"),
+        value="`/setupticket`\n`/closeticket`",
+        inline=False,
     )
     embed.add_field(
-        name="💬 ทั่วไป",
-        value="`/ping` `/userinfo` `/serverinfo` `/poll` `/say`",
-        inline=False
+        name=L(guild_id, "help_scripthub"),
+        value="`/scripthub_setup`\n`/scripthub_additem`\n`/scripthub_removeitem`\n`/scripthub_listitems`",
+        inline=False,
     )
     embed.add_field(
-        name="🟦 Roblox / Rolimon's",
-        value="`/user` — ดูสถิติ Roblox ของผู้ใช้ (RAP, Value, Collectibles, Value Rank)",
-        inline=False
+        name=L(guild_id, "help_ai"),
+        value="`/ai_setup`\n`/ai_toggle`\n`/ai_persona`\n`/ai_reset`",
+        inline=False,
     )
     embed.add_field(
-        name="⭐ ยืนยันตัวตน",
-        value="`/setupverify` — ตั้งค่า+ส่งข้อความยืนยันตัวตน (กดปุ่มรับยศ)",
-        inline=False
+        name=L(guild_id, "help_rules"),
+        value="`/rules_setup`\n`/rules_addsection`\n`/rules_removesection`\n`/rules_listsections`",
+        inline=False,
     )
-    embed.add_field(
-        name="🎭 เมนูรับยศด้วยรีแอค",
-        value=(
-            "`/rolemenu_create` — สร้างเมนูรับยศ\n"
-            "`/rolemenu_add` — เพิ่มอิโมจิ+ยศเข้าเมนู\n"
-            "`/rolemenu_remove` — ลบอิโมจิออกจากเมนู"
-        ),
-        inline=False
-    )
-    embed.add_field(
-        name="🎫 ระบบทิกเก็ต",
-        value=(
-            "`/setupticket` — ตั้งค่า+ส่งข้อความเปิดทิกเก็ต\n"
-            "`/closeticket` — ปิดทิกเก็ตปัจจุบัน (หรือกดปุ่มในห้องทิกเก็ต)"
-        ),
-        inline=False
-    )
-    embed.add_field(
-        name="📂 แผงแจกไฟล์/เทมเพลต (Script Hub)",
-        value=(
-            "`/scripthub_setup` — สร้าง/อัปเดตแผง (มีเมนู dropdown)\n"
-            "`/scripthub_additem` — เพิ่มรายการไฟล์/ข้อความเข้าแผง\n"
-            "`/scripthub_removeitem` — ลบรายการออกจากแผง\n"
-            "`/scripthub_listitems` — ดูรายการทั้งหมดในแผง"
-        ),
-        inline=False
-    )
-    embed.add_field(
-        name="🤖 AI ตอบแชท",
-        value=(
-            "`/ai_setup` — เปิดใช้งาน + เลือกห้องที่ให้ AI ตอบทุกข้อความ (ไม่เลือก = ตอบเมื่อถูกแท็ก)\n"
-            "`/ai_toggle` — เปิด/ปิดระบบ\n"
-            "`/ai_persona` — ตั้งค่าบุคลิก/กติกาของ AI\n"
-            "`/ai_reset` — ล้างความจำการสนทนาของห้องนี้"
-        ),
-        inline=False
-    )
+    embed.add_field(name=L(guild_id, "help_settings"), value=L(guild_id, "help_settings_desc"), inline=False)
     await interaction.response.send_message(embed=embed)
 
 
 # =========================================================
-# จัดการข้อผิดพลาด (Error Handling)
+# Error handling
 # =========================================================
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.MissingPermissions):
-        msg = "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้"
-    elif isinstance(error, app_commands.CheckFailure):
-        msg = "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้"
+    guild_id = interaction.guild.id if interaction.guild else None
+
+    if isinstance(error, (app_commands.MissingPermissions, app_commands.CheckFailure)):
+        msg = L(guild_id, "error_no_permission") if guild_id else "❌ You don't have permission to use this command"
+        title = None
     else:
-        # ไม่ส่ง raw error message กลับไปหาผู้ใช้ (กันหลุด internal detail) — เก็บรายละเอียดไว้ใน log แทน
-        msg = "❌ เกิดข้อผิดพลาดขณะทำคำสั่งนี้ กรุณาลองใหม่อีกครั้ง"
+        msg = L(guild_id, "error_generic_desc") if guild_id else "❌ An error occurred while running this command. Please try again"
+        title = L(guild_id, "error_generic_title") if guild_id else "Something went wrong"
         logger.exception(f"Unhandled app command error: {error}")
 
-    embed = base_embed("เกิดข้อผิดพลาด", msg, color=Theme.DANGER, guild=interaction.guild if interaction.guild else None)
+    embed = base_embed(title or "❌", msg, color=Theme.DANGER, guild=interaction.guild if interaction.guild else None)
 
     if interaction.response.is_done():
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -2125,16 +2956,15 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 if __name__ == "__main__":
     if not TOKEN:
         logger.error(
-            "ไม่พบ DISCORD_TOKEN — กรุณาสร้างไฟล์ .env (ดูตัวอย่างใน .env.example) "
-            "แล้วใส่ DISCORD_TOKEN=โทเคนของคุณ ก่อนรันบอท"
+            "BOT_TOKEN not found — please create a .env file (see .env.example) "
+            "and set BOT_TOKEN=your_token before running the bot."
         )
     else:
-        start_keep_alive()  # เปิด HTTP server เล็ก ๆ ไว้ก่อน เพื่อให้ Render ping ได้
+        start_keep_alive()
         try:
-            # discord.py มี reconnect logic ในตัวอยู่แล้วสำหรับการหลุดชั่วคราว
             bot.run(TOKEN, log_handler=None)
         except discord.LoginFailure:
-            logger.error("Token ไม่ถูกต้อง กรุณาตรวจสอบค่า DISCORD_TOKEN ใน .env")
+            logger.error("Invalid token — please check BOT_TOKEN in .env")
         except Exception:
-            logger.exception("บอทหยุดทำงานเพราะเกิดข้อผิดพลาดที่ไม่คาดคิด")
-            raise  # ให้ตัวคุมโปรเซสภายนอก (systemd/pm2) จับแล้วรีสตาร์ทให้
+            logger.exception("Bot stopped due to an unexpected error")
+            raise
