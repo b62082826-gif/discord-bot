@@ -4,6 +4,7 @@ import logging
 import datetime
 import threading
 import asyncio
+import re
 from collections import deque
 from datetime import timezone, timedelta
 
@@ -164,6 +165,51 @@ def base_embed(
     footer_text = f"{guild.name}" if guild else (bot.user.name if bot.user else "BOB_BOT")
     embed.set_footer(text=f"✨ {footer_text}", icon_url=footer_icon)
     return embed
+
+
+# =========================================================
+# Rules text auto-formatter
+# =========================================================
+# Admins often paste rules as one flat paragraph like:
+#   "1. Respect everyone Treat others with kindness. 2. Do not post ..."
+# This detects a sequential numbered list embedded in the text (even
+# without any line breaks) and rewrites it as one bolded item per line,
+# separated by blank lines, so it always renders readably in Discord.
+_RULES_NUMBER_PATTERN = re.compile(r"(?:(?<=^)|(?<=\s))(\d{1,2})\.\s+")
+
+
+def format_rules_content(text: str) -> str:
+    if not text:
+        return text
+
+    # Already has explicit numbered lines -> assume the admin formatted it
+    # on purpose and leave it alone.
+    if re.search(r"(?:\r?\n)\s*\d{1,2}\.\s", text):
+        return text
+
+    matches = list(_RULES_NUMBER_PATTERN.finditer(text))
+    if len(matches) < 2:
+        return text
+
+    numbers = [int(m.group(1)) for m in matches]
+    # Only treat this as a numbered list if it starts at 1 (or 0) and the
+    # numbers are non-decreasing — avoids mangling text that just happens
+    # to contain "24." somewhere in the middle.
+    if numbers[0] not in (0, 1):
+        return text
+    if any(numbers[i] > numbers[i + 1] for i in range(len(numbers) - 1)):
+        return text
+
+    parts = []
+    for i, m in enumerate(matches):
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        body = text[start:end].strip()
+        if not body:
+            continue
+        parts.append(f"**{m.group(1)}.** {body}")
+
+    return "\n\n".join(parts) if parts else text
 
 
 # =========================================================
@@ -1604,7 +1650,7 @@ def build_rules_embeds(guild_id: int, conf: dict) -> list[discord.Embed]:
         color = discord.Color(color_value) if color_value else Theme.RULES_PALETTE[idx % len(Theme.RULES_PALETTE)]
         embed = discord.Embed(
             title=f"[{section['code']}] {section['name']}",
-            description=section["content"],
+            description=format_rules_content(section["content"]),
             color=color,
         )
         embeds.append(embed)
@@ -2542,6 +2588,10 @@ async def rules_addsection(
             color_value = int(color_hex.strip().lstrip("#"), 16)
         except ValueError:
             color_value = None
+
+    # Auto-format the pasted rules text: turns "1. Foo 2. Bar" into a
+    # properly line-broken, bolded numbered list when it looks like one.
+    content = format_rules_content(content)
 
     existing = next((s for s in sections if s["code"] == code_upper), None)
     is_update = existing is not None
