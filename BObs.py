@@ -391,9 +391,9 @@ TRANSLATIONS = {
         # rules
         "rules_setup_success_title": "Setup successful ✅",
         "rules_setup_sending": "Sending the rules panel...",
-        "rules_setup_empty_note": "No languages added yet — use `/rules_addsection` to add your first one.",
+        "rules_setup_empty_note": "No languages added yet — use `/rules_edit` to add your first one.",
         "rules_placeholder_title": "📜 Server Rules",
-        "rules_placeholder_desc": "No rules have been added yet. An admin can add sections with `/rules_addsection`.",
+        "rules_placeholder_desc": "No rules have been added yet. An admin can add sections with `/rules_edit`.",
         "rules_not_setup_title": "Rules panel not created yet",
         "rules_not_setup_desc": "❌ Please run `/rules_setup` first.",
         "rules_section_added_title": "Section added ✅",
@@ -406,10 +406,23 @@ TRANSLATIONS = {
         "rules_section_not_found_title": "Section not found",
         "rules_section_not_found_desc": "❌ No rules section with the code **{code}** was found",
         "rules_no_sections_title": "No sections yet",
-        "rules_no_sections_desc": "📭 There are no rules sections yet. Use `/rules_addsection` to add one.",
+        "rules_no_sections_desc": "📭 There are no rules sections yet. Use `/rules_edit` to add one.",
         "rules_list_title": "📋 Rules sections in this server",
         "rules_too_many_title": "Too many sections",
         "rules_too_many_desc": "❌ A single message can only hold up to 10 embeds, and this panel already has {count}.",
+        "rules_modal_title": "Editing: rules ({code})",
+        "rules_modal_field_title": "Title",
+        "rules_modal_field_description": "Description",
+        "rules_modal_field_color": "Hex Color",
+        "rules_modal_saved": "✅ Saved — here's a preview:",
+        "rules_modal_author_title": "Editing: rules ({code}) — author",
+        "rules_modal_field_author_name": "Author name",
+        "rules_modal_field_icon_url": "Icon URL",
+        "rules_modal_footer_title": "Editing: rules ({code}) — footer",
+        "rules_modal_field_footer_text": "Footer text",
+        "rules_modal_images_title": "Editing: rules ({code}) — images",
+        "rules_modal_field_image_url": "Image URL",
+        "rules_modal_field_thumbnail_url": "Thumbnail URL",
 
         # moderation & general (used across commands)
         "clear_success_title": "Messages cleared 🧹",
@@ -640,9 +653,9 @@ TRANSLATIONS = {
 
         "rules_setup_success_title": "ตั้งค่าสำเร็จ ✅",
         "rules_setup_sending": "กำลังส่งแผงกฎเซิร์ฟเวอร์...",
-        "rules_setup_empty_note": "ยังไม่มีภาษาไหนถูกเพิ่ม — ใช้ `/rules_addsection` เพื่อเพิ่มภาษาแรก",
+        "rules_setup_empty_note": "ยังไม่มีภาษาไหนถูกเพิ่ม — ใช้ `/rules_edit` เพื่อเพิ่มภาษาแรก",
         "rules_placeholder_title": "📜 กฎของเซิร์ฟเวอร์",
-        "rules_placeholder_desc": "ยังไม่มีการเพิ่มกฎ แอดมินสามารถเพิ่มได้ด้วย `/rules_addsection`",
+        "rules_placeholder_desc": "ยังไม่มีการเพิ่มกฎ แอดมินสามารถเพิ่มได้ด้วย `/rules_edit`",
         "rules_not_setup_title": "ยังไม่ได้สร้างแผงกฎ",
         "rules_not_setup_desc": "❌ กรุณาใช้ `/rules_setup` ก่อน",
         "rules_section_added_title": "เพิ่มส่วนกฎสำเร็จ ✅",
@@ -655,10 +668,23 @@ TRANSLATIONS = {
         "rules_section_not_found_title": "ไม่พบส่วนกฎนี้",
         "rules_section_not_found_desc": "❌ ไม่พบกฎภาษา **{code}**",
         "rules_no_sections_title": "ยังไม่มีข้อมูล",
-        "rules_no_sections_desc": "📭 ยังไม่มีส่วนกฎใด ๆ ใช้ `/rules_addsection` เพื่อเพิ่ม",
+        "rules_no_sections_desc": "📭 ยังไม่มีส่วนกฎใด ๆ ใช้ `/rules_edit` เพื่อเพิ่ม",
         "rules_list_title": "📋 รายการกฎในเซิร์ฟเวอร์นี้",
         "rules_too_many_title": "มีภาษาเยอะเกินไป",
         "rules_too_many_desc": "❌ หนึ่งข้อความแสดง embed ได้สูงสุด 10 อัน ตอนนี้แผงนี้มี {count} แล้ว",
+        "rules_modal_title": "Editing: rules ({code})",
+        "rules_modal_field_title": "Title",
+        "rules_modal_field_description": "Description",
+        "rules_modal_field_color": "Hex Color",
+        "rules_modal_saved": "✅ บันทึกแล้ว — ตัวอย่าง:",
+        "rules_modal_author_title": "Editing: rules ({code}) — author",
+        "rules_modal_field_author_name": "Author name",
+        "rules_modal_field_icon_url": "Icon URL",
+        "rules_modal_footer_title": "Editing: rules ({code}) — footer",
+        "rules_modal_field_footer_text": "Footer text",
+        "rules_modal_images_title": "Editing: rules ({code}) — images",
+        "rules_modal_field_image_url": "Image URL",
+        "rules_modal_field_thumbnail_url": "Thumbnail URL",
 
         "clear_success_title": "ลบข้อความสำเร็จ 🧹",
         "clear_success_desc": "ลบข้อความไปแล้ว **{count}** ข้อความ สะอาดเอี่ยม {clap}",
@@ -1631,6 +1657,25 @@ def build_scripthub_embed(guild_id: int, conf: dict) -> discord.Embed:
     return embed
 
 
+def build_single_rules_embed(idx: int, section: dict) -> discord.Embed:
+    color_value = section.get("color")
+    color = discord.Color(color_value) if color_value else Theme.RULES_PALETTE[idx % len(Theme.RULES_PALETTE)]
+    embed = discord.Embed(
+        title=f"[{section['code']}] {section['name']}",
+        description=format_rules_content(section["content"]),
+        color=color,
+    )
+    if section.get("author_name"):
+        embed.set_author(name=section["author_name"], icon_url=section.get("author_icon_url") or None)
+    if section.get("footer_text"):
+        embed.set_footer(text=section["footer_text"], icon_url=section.get("footer_icon_url") or None)
+    if section.get("image_url"):
+        embed.set_image(url=section["image_url"])
+    if section.get("thumbnail_url"):
+        embed.set_thumbnail(url=section["thumbnail_url"])
+    return embed
+
+
 def build_rules_embeds(guild_id: int, conf: dict) -> list[discord.Embed]:
     """Build one embed per language section, in the order they were added."""
     sections = conf.get("sections", [])
@@ -1644,17 +1689,264 @@ def build_rules_embeds(guild_id: int, conf: dict) -> list[discord.Embed]:
                 timestamp=False,
             )
         ]
-    embeds = []
-    for idx, section in enumerate(sections):
-        color_value = section.get("color")
-        color = discord.Color(color_value) if color_value else Theme.RULES_PALETTE[idx % len(Theme.RULES_PALETTE)]
-        embed = discord.Embed(
-            title=f"[{section['code']}] {section['name']}",
-            description=format_rules_content(section["content"]),
-            color=color,
+    return [build_single_rules_embed(idx, section) for idx, section in enumerate(sections)]
+
+
+def get_rules_section(conf: dict, code_upper: str) -> dict | None:
+    return next((s for s in conf.get("sections", []) if s["code"] == code_upper), None)
+
+
+async def sync_rules_panel(guild_id: int, guild: discord.Guild, conf: dict) -> bool:
+    """Best-effort refresh of the live rules panel message. Returns True if updated."""
+    if not conf.get("channel_id") or not conf.get("message_id"):
+        return False
+    try:
+        channel = guild.get_channel(int(conf["channel_id"]))
+        if not channel:
+            return False
+        msg = await channel.fetch_message(int(conf["message_id"]))
+        await msg.edit(embeds=build_rules_embeds(guild_id, conf))
+        return True
+    except (discord.NotFound, discord.Forbidden, AttributeError):
+        return False
+
+
+class RulesMainModal(discord.ui.Modal):
+    """Matches the 'Editing: ...' popup — Title / Description / Hex Color, applied to one
+    language section of the server rules (Title = language name, Description = rules text)."""
+
+    def __init__(self, guild_id: int, code_upper: str, section: dict | None):
+        super().__init__(title=L(guild_id, "rules_modal_title", code=code_upper))
+        self.guild_id = guild_id
+        self.code_upper = code_upper
+
+        self.title_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_title"),
+            required=True,
+            max_length=100,
+            default=(section.get("name") if section else "") or "",
         )
-        embeds.append(embed)
-    return embeds
+        self.description_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_description"),
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=4000,
+            default=(section.get("content") if section else "") or "",
+        )
+        self.color_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_color"),
+            required=False,
+            max_length=7,
+            default=(f"{section.get('color'):06X}" if section and section.get("color") else ""),
+        )
+        self.add_item(self.title_input)
+        self.add_item(self.description_input)
+        self.add_item(self.color_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = self.guild_id
+        code_upper = self.code_upper
+        conf = rules_config.get(str(guild_id))
+        if not conf:
+            await interaction.response.send_message(
+                embed=base_embed(L(guild_id, "rules_not_setup_title"), L(guild_id, "rules_not_setup_desc"), color=Theme.DANGER, guild=interaction.guild),
+                ephemeral=True,
+            )
+            return
+
+        sections = conf.setdefault("sections", [])
+        existing = get_rules_section(conf, code_upper)
+        is_update = existing is not None
+
+        if not is_update and len(sections) >= 10:
+            await interaction.response.send_message(
+                embed=base_embed(L(guild_id, "rules_too_many_title"), L(guild_id, "rules_too_many_desc", count=len(sections)), color=Theme.WARNING, guild=interaction.guild),
+                ephemeral=True,
+            )
+            return
+
+        color_raw = self.color_input.value.strip().lstrip("#")
+        color_value = existing.get("color") if existing else None
+        if color_raw:
+            try:
+                color_value = int(color_raw, 16)
+            except ValueError:
+                pass
+        elif self.color_input.value == "":
+            color_value = None
+
+        lang_name = self.title_input.value.strip()
+        content = format_rules_content(self.description_input.value.strip())
+
+        section_data = {"code": code_upper, "name": lang_name, "content": content, "color": color_value}
+        if is_update:
+            existing.update(section_data)
+        else:
+            sections.append(section_data)
+        save_rules_config(rules_config)
+
+        updated_live = await sync_rules_panel(guild_id, interaction.guild, conf)
+        note = L(guild_id, "rules_note_live_updated") if updated_live else L(guild_id, "rules_note_live_missing")
+        desc_key = "rules_section_updated_desc" if is_update else "rules_section_added_desc"
+
+        section = get_rules_section(conf, code_upper)
+        preview = build_single_rules_embed(0, section)
+        await interaction.response.send_message(
+            content=L(guild_id, desc_key, name=lang_name, code=code_upper, note=note),
+            embed=preview,
+            view=RulesEditView(guild_id, code_upper),
+            ephemeral=True,
+        )
+
+
+class RulesAuthorModal(discord.ui.Modal):
+    def __init__(self, guild_id: int, code_upper: str, section: dict):
+        super().__init__(title=L(guild_id, "rules_modal_author_title", code=code_upper))
+        self.guild_id = guild_id
+        self.code_upper = code_upper
+        self.name_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_author_name"),
+            required=False,
+            max_length=256,
+            default=section.get("author_name") or "",
+        )
+        self.icon_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_icon_url"),
+            required=False,
+            default=section.get("author_icon_url") or "",
+        )
+        self.add_item(self.name_input)
+        self.add_item(self.icon_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = self.guild_id
+        conf = rules_config.get(str(guild_id), {})
+        section = get_rules_section(conf, self.code_upper)
+        if section is None:
+            return
+        section["author_name"] = self.name_input.value.strip() or None
+        section["author_icon_url"] = self.icon_input.value.strip() or None
+        save_rules_config(rules_config)
+        await sync_rules_panel(guild_id, interaction.guild, conf)
+
+        preview = build_single_rules_embed(0, section)
+        await interaction.response.send_message(
+            content=L(guild_id, "rules_modal_saved"),
+            embed=preview,
+            view=RulesEditView(guild_id, self.code_upper),
+            ephemeral=True,
+        )
+
+
+class RulesFooterModal(discord.ui.Modal):
+    def __init__(self, guild_id: int, code_upper: str, section: dict):
+        super().__init__(title=L(guild_id, "rules_modal_footer_title", code=code_upper))
+        self.guild_id = guild_id
+        self.code_upper = code_upper
+        self.text_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_footer_text"),
+            required=False,
+            max_length=2048,
+            default=section.get("footer_text") or "",
+        )
+        self.icon_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_icon_url"),
+            required=False,
+            default=section.get("footer_icon_url") or "",
+        )
+        self.add_item(self.text_input)
+        self.add_item(self.icon_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = self.guild_id
+        conf = rules_config.get(str(guild_id), {})
+        section = get_rules_section(conf, self.code_upper)
+        if section is None:
+            return
+        section["footer_text"] = self.text_input.value.strip() or None
+        section["footer_icon_url"] = self.icon_input.value.strip() or None
+        save_rules_config(rules_config)
+        await sync_rules_panel(guild_id, interaction.guild, conf)
+
+        preview = build_single_rules_embed(0, section)
+        await interaction.response.send_message(
+            content=L(guild_id, "rules_modal_saved"),
+            embed=preview,
+            view=RulesEditView(guild_id, self.code_upper),
+            ephemeral=True,
+        )
+
+
+class RulesImagesModal(discord.ui.Modal):
+    def __init__(self, guild_id: int, code_upper: str, section: dict):
+        super().__init__(title=L(guild_id, "rules_modal_images_title", code=code_upper))
+        self.guild_id = guild_id
+        self.code_upper = code_upper
+        self.image_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_image_url"),
+            required=False,
+            default=section.get("image_url") or "",
+        )
+        self.thumbnail_input = discord.ui.TextInput(
+            label=L(guild_id, "rules_modal_field_thumbnail_url"),
+            required=False,
+            default=section.get("thumbnail_url") or "",
+        )
+        self.add_item(self.image_input)
+        self.add_item(self.thumbnail_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = self.guild_id
+        conf = rules_config.get(str(guild_id), {})
+        section = get_rules_section(conf, self.code_upper)
+        if section is None:
+            return
+        section["image_url"] = self.image_input.value.strip() or None
+        section["thumbnail_url"] = self.thumbnail_input.value.strip() or None
+        save_rules_config(rules_config)
+        await sync_rules_panel(guild_id, interaction.guild, conf)
+
+        preview = build_single_rules_embed(0, section)
+        await interaction.response.send_message(
+            content=L(guild_id, "rules_modal_saved"),
+            embed=preview,
+            view=RulesEditView(guild_id, self.code_upper),
+            ephemeral=True,
+        )
+
+
+class RulesEditView(discord.ui.View):
+    """The row of buttons under the modal preview: edit color/description, edit author,
+    edit footer, edit images — matches the reference screenshot."""
+
+    def __init__(self, guild_id: int, code_upper: str):
+        super().__init__(timeout=300)
+        self.guild_id = guild_id
+        self.code_upper = code_upper
+
+    @discord.ui.button(label="edit color / description", style=discord.ButtonStyle.secondary)
+    async def edit_main(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conf = rules_config.get(str(self.guild_id), {})
+        section = get_rules_section(conf, self.code_upper)
+        await interaction.response.send_modal(RulesMainModal(self.guild_id, self.code_upper, section))
+
+    @discord.ui.button(label="edit author", style=discord.ButtonStyle.secondary)
+    async def edit_author(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conf = rules_config.get(str(self.guild_id), {})
+        section = get_rules_section(conf, self.code_upper) or {}
+        await interaction.response.send_modal(RulesAuthorModal(self.guild_id, self.code_upper, section))
+
+    @discord.ui.button(label="edit footer", style=discord.ButtonStyle.secondary)
+    async def edit_footer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conf = rules_config.get(str(self.guild_id), {})
+        section = get_rules_section(conf, self.code_upper) or {}
+        await interaction.response.send_modal(RulesFooterModal(self.guild_id, self.code_upper, section))
+
+    @discord.ui.button(label="edit images", style=discord.ButtonStyle.secondary)
+    async def edit_images(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conf = rules_config.get(str(self.guild_id), {})
+        section = get_rules_section(conf, self.code_upper) or {}
+        await interaction.response.send_modal(RulesImagesModal(self.guild_id, self.code_upper, section))
 
 
 async def load_custom_emojis():
@@ -2555,21 +2847,10 @@ async def rules_setup(interaction: discord.Interaction):
     await interaction.edit_original_response(content=f"✅{note}")
 
 
-@bot.tree.command(name="rules_addsection", description="Add or update a language section in the rules panel")
-@app_commands.describe(
-    lang_code="Short code for this language, e.g. EN, RU, TH",
-    lang_name="Full language name shown in the title, e.g. English",
-    content="The full rules text for this language (markdown supported)",
-    color_hex="Optional accent color as a hex code, e.g. FF0000 (defaults to a rotating palette)",
-)
+@bot.tree.command(name="rules_edit", description="Open the rules editor for a language section (title/description/color, + author/footer/images)")
+@app_commands.describe(lang_code="Short code for this language, e.g. EN, RU, TH (creates it if it doesn't exist yet)")
 @app_commands.checks.has_permissions(manage_guild=True)
-async def rules_addsection(
-    interaction: discord.Interaction,
-    lang_code: str,
-    lang_name: str,
-    content: str,
-    color_hex: str = None,
-):
+async def rules_edit(interaction: discord.Interaction, lang_code: str):
     guild_id = interaction.guild.id
     conf = rules_config.get(str(guild_id))
     if not conf:
@@ -2579,58 +2860,9 @@ async def rules_addsection(
         )
         return
 
-    sections = conf.setdefault("sections", [])
     code_upper = lang_code.strip().upper()
-
-    color_value = None
-    if color_hex:
-        try:
-            color_value = int(color_hex.strip().lstrip("#"), 16)
-        except ValueError:
-            color_value = None
-
-    # Auto-format the pasted rules text: turns "1. Foo 2. Bar" into a
-    # properly line-broken, bolded numbered list when it looks like one.
-    content = format_rules_content(content)
-
-    existing = next((s for s in sections if s["code"] == code_upper), None)
-    is_update = existing is not None
-
-    if not is_update and len(sections) >= 10:
-        await interaction.response.send_message(
-            embed=base_embed(L(guild_id, "rules_too_many_title"), L(guild_id, "rules_too_many_desc", count=len(sections)), color=Theme.WARNING, guild=interaction.guild),
-            ephemeral=True,
-        )
-        return
-
-    section_data = {"code": code_upper, "name": lang_name, "content": content, "color": color_value}
-    if is_update:
-        existing.update(section_data)
-    else:
-        sections.append(section_data)
-    save_rules_config(rules_config)
-
-    updated_live = False
-    if conf.get("channel_id") and conf.get("message_id"):
-        try:
-            channel = interaction.guild.get_channel(int(conf["channel_id"]))
-            msg = await channel.fetch_message(int(conf["message_id"]))
-            await msg.edit(embeds=build_rules_embeds(guild_id, conf))
-            updated_live = True
-        except (discord.NotFound, discord.Forbidden, AttributeError):
-            pass
-
-    note = L(guild_id, "rules_note_live_updated") if updated_live else L(guild_id, "rules_note_live_missing")
-    desc_key = "rules_section_updated_desc" if is_update else "rules_section_added_desc"
-    await interaction.response.send_message(
-        embed=base_embed(
-            L(guild_id, "rules_section_added_title"),
-            L(guild_id, desc_key, name=lang_name, code=code_upper, note=note),
-            color=Theme.SUCCESS,
-            guild=interaction.guild,
-        ),
-        ephemeral=True,
-    )
+    section = get_rules_section(conf, code_upper)
+    await interaction.response.send_modal(RulesMainModal(guild_id, code_upper, section))
 
 
 @bot.tree.command(name="rules_removesection", description="Remove a language section from the rules panel")
@@ -2973,7 +3205,7 @@ async def help_command(interaction: discord.Interaction):
     )
     embed.add_field(
         name=L(guild_id, "help_rules"),
-        value="`/rules_setup`\n`/rules_addsection`\n`/rules_removesection`\n`/rules_listsections`",
+        value="`/rules_setup`\n`/rules_edit`\n`/rules_removesection`\n`/rules_listsections`",
         inline=False,
     )
     embed.add_field(name=L(guild_id, "help_settings"), value=L(guild_id, "help_settings_desc"), inline=False)
