@@ -35,27 +35,30 @@ logger = logging.getLogger("bobbot")
 # Theme colors — keeps every embed in the bot visually consistent
 # ---------------------------------------------------------
 class Theme:
-    PRIMARY = discord.Color.from_rgb(114, 137, 218)
-    SUCCESS = discord.Color.from_rgb(87, 242, 135)
-    DANGER = discord.Color.from_rgb(237, 66, 69)
-    WARNING = discord.Color.from_rgb(255, 186, 73)
-    INFO = discord.Color.from_rgb(88, 164, 255)
-    TICKET = discord.Color.from_rgb(59, 165, 93)
-    SCRIPTHUB = discord.Color.from_rgb(153, 69, 255)
-    ROLIMONS = discord.Color.from_rgb(66, 135, 245)
+    # A slightly richer, more "premium" palette than plain Discord defaults —
+    # deeper saturation, better contrast against the dark theme.
+    PRIMARY = discord.Color.from_rgb(124, 77, 255)      # rich indigo/violet
+    SUCCESS = discord.Color.from_rgb(46, 213, 148)       # emerald
+    DANGER = discord.Color.from_rgb(255, 71, 87)         # coral red
+    WARNING = discord.Color.from_rgb(255, 177, 66)       # amber
+    INFO = discord.Color.from_rgb(64, 156, 255)          # sky blue
+    TICKET = discord.Color.from_rgb(0, 200, 150)         # teal-green
+    SCRIPTHUB = discord.Color.from_rgb(168, 85, 247)     # electric purple
+    ROLIMONS = discord.Color.from_rgb(56, 132, 255)      # roblox blue
 
-    DIVIDER = "─────────────────────"
+    # Small "eyebrow" glyphs used to open a divider line with a bit of flair
+    DIVIDER = "┈┈┈┈┈┈┈┈┈┈┈❖┈┈┈┈┈┈┈┈┈┈┈"
+    BAR = "▎"  # thin accent bar prefixed to key lines for a "card" feel
 
     # Rotating accent colors used for Rules language sections when no
-    # custom color is given (first one matches the red bar in the example,
-    # second matches the blue bar, etc.)
+    # custom color is given.
     RULES_PALETTE = [
-        discord.Color.from_rgb(230, 60, 60),
-        discord.Color.from_rgb(60, 110, 230),
-        discord.Color.from_rgb(60, 200, 120),
-        discord.Color.from_rgb(230, 170, 60),
-        discord.Color.from_rgb(170, 90, 230),
-        discord.Color.from_rgb(60, 200, 200),
+        discord.Color.from_rgb(255, 82, 82),
+        discord.Color.from_rgb(66, 133, 244),
+        discord.Color.from_rgb(52, 199, 123),
+        discord.Color.from_rgb(255, 170, 51),
+        discord.Color.from_rgb(178, 102, 255),
+        discord.Color.from_rgb(45, 212, 191),
     ]
 
 
@@ -162,8 +165,11 @@ def base_embed(
         timestamp=datetime.datetime.now(timezone.utc) if timestamp else None,
     )
     footer_icon = guild.icon.url if guild and guild.icon else (bot.user.display_avatar.url if bot.user else None)
-    footer_text = f"{guild.name}" if guild else (bot.user.name if bot.user else "BOB_BOT")
-    embed.set_footer(text=f"✨ {footer_text}", icon_url=footer_icon)
+    bot_name = bot.user.name if bot.user else "BOB_BOT"
+    if guild:
+        embed.set_footer(text=f"◆ {guild.name} • {bot_name}", icon_url=footer_icon)
+    else:
+        embed.set_footer(text=f"◆ {bot_name}", icon_url=footer_icon)
     return embed
 
 
@@ -1651,7 +1657,7 @@ def build_scripthub_embed(guild_id: int, conf: dict) -> discord.Embed:
     embed.set_thumbnail(url=bot.user.display_avatar.url if bot.user else None)
     items_count = len(conf.get("items", []))
     embed.set_footer(
-        text=f"✨ {bot.user.name if bot.user else 'BOB_BOT'} • {L(guild_id, 'scripthub_items_ready_footer', count=items_count)}",
+        text=f"◆ {bot.user.name if bot.user else 'BOB_BOT'} • {L(guild_id, 'scripthub_items_ready_footer', count=items_count)}",
         icon_url=bot.user.display_avatar.url if bot.user else None,
     )
     return embed
@@ -1669,6 +1675,8 @@ def build_single_rules_embed(idx: int, section: dict) -> discord.Embed:
         embed.set_author(name=section["author_name"], icon_url=section.get("author_icon_url") or None)
     if section.get("footer_text"):
         embed.set_footer(text=section["footer_text"], icon_url=section.get("footer_icon_url") or None)
+    else:
+        embed.set_footer(text=f"◆ {section['code']} • {bot.user.name if bot.user else 'BOB_BOT'}")
     if section.get("image_url"):
         embed.set_image(url=section["image_url"])
     if section.get("thumbnail_url"):
@@ -1963,6 +1971,11 @@ async def load_custom_emojis():
 async def on_ready():
     logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
 
+    try:
+        await bot.change_presence(status=discord.Status.dnd)
+    except Exception:
+        logger.exception("Failed to set initial Do Not Disturb presence")
+
     if not bot.startup_done:
         await load_custom_emojis()
         try:
@@ -2070,7 +2083,7 @@ async def update_status():
         )
 
         activity = discord.Activity(type=discord.ActivityType.watching, name=status_text)
-        await bot.change_presence(activity=activity)
+        await bot.change_presence(status=discord.Status.dnd, activity=activity)
     except Exception:
         logger.exception("Error while updating bot status")
 
@@ -2089,13 +2102,16 @@ async def update_status_error(error):
 async def settings(interaction: discord.Interaction):
     guild_id = interaction.guild.id
     current_lang_name = AVAILABLE_LANGUAGES[get_guild_language(guild_id)]["name"]
+    embed = base_embed(
+        L(guild_id, "settings_title"),
+        L(guild_id, "settings_desc", current=current_lang_name),
+        color=Theme.PRIMARY,
+        guild=interaction.guild,
+    )
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
     await interaction.response.send_message(
-        embed=base_embed(
-            L(guild_id, "settings_title"),
-            L(guild_id, "settings_desc", current=current_lang_name),
-            color=Theme.PRIMARY,
-            guild=interaction.guild,
-        ),
+        embed=embed,
         view=SettingsView(guild_id),
         ephemeral=True,
     )
@@ -2186,14 +2202,15 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
     await interaction.response.send_message(embed=embed)
     try:
-        await member.send(
-            embed=base_embed(
-                L(guild_id, "warn_dm_title"),
-                L(guild_id, "warn_dm_desc", guild=interaction.guild.name),
-                color=Theme.WARNING,
-                guild=interaction.guild,
-            ).add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
-        )
+        dm_embed = base_embed(
+            L(guild_id, "warn_dm_title"),
+            L(guild_id, "warn_dm_desc", guild=interaction.guild.name),
+            color=Theme.WARNING,
+            guild=interaction.guild,
+        ).add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
+        if interaction.guild.icon:
+            dm_embed.set_thumbnail(url=interaction.guild.icon.url)
+        await member.send(embed=dm_embed)
     except discord.Forbidden:
         pass
 
@@ -2299,14 +2316,14 @@ async def timeout(interaction: discord.Interaction, member: discord.Member, minu
 async def addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     guild_id = interaction.guild.id
     await member.add_roles(role)
-    await interaction.response.send_message(
-        embed=base_embed(
-            L(guild_id, "addrole_success_title"),
-            L(guild_id, "addrole_success_desc", role=role.mention, member=member.mention, thumbsup=E("fun_thumbsup", "👍")),
-            color=Theme.SUCCESS,
-            guild=interaction.guild,
-        )
+    embed = base_embed(
+        L(guild_id, "addrole_success_title"),
+        L(guild_id, "addrole_success_desc", role=role.mention, member=member.mention, thumbsup=E("fun_thumbsup", "👍")),
+        color=Theme.SUCCESS,
+        guild=interaction.guild,
     )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.tree.command(name="removerole", description="Remove a role from a member")
@@ -2315,14 +2332,14 @@ async def addrole(interaction: discord.Interaction, member: discord.Member, role
 async def removerole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     guild_id = interaction.guild.id
     await member.remove_roles(role)
-    await interaction.response.send_message(
-        embed=base_embed(
-            L(guild_id, "removerole_success_title"),
-            L(guild_id, "removerole_success_desc", role=role.mention, member=member.mention, ohno=E("fun_ohno", "😅")),
-            color=Theme.WARNING,
-            guild=interaction.guild,
-        )
+    embed = base_embed(
+        L(guild_id, "removerole_success_title"),
+        L(guild_id, "removerole_success_desc", role=role.mention, member=member.mention, ohno=E("fun_ohno", "😅")),
+        color=Theme.WARNING,
+        guild=interaction.guild,
     )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.tree.command(name="nick", description="Change a member's nickname")
@@ -2331,14 +2348,14 @@ async def removerole(interaction: discord.Interaction, member: discord.Member, r
 async def nick(interaction: discord.Interaction, member: discord.Member, new_nick: str):
     guild_id = interaction.guild.id
     await member.edit(nick=new_nick)
-    await interaction.response.send_message(
-        embed=base_embed(
-            L(guild_id, "nick_success_title"),
-            L(guild_id, "nick_success_desc", member=member.mention, nick=new_nick, laughter=E("fun_laughter", "😂")),
-            color=Theme.SUCCESS,
-            guild=interaction.guild,
-        )
+    embed = base_embed(
+        L(guild_id, "nick_success_title"),
+        L(guild_id, "nick_success_desc", member=member.mention, nick=new_nick, laughter=E("fun_laughter", "😂")),
+        color=Theme.SUCCESS,
+        guild=interaction.guild,
     )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await interaction.response.send_message(embed=embed)
 
 
 # =========================================================
@@ -2942,15 +2959,15 @@ async def ai_setup(interaction: discord.Interaction, channel: discord.TextChanne
     save_ai_config(ai_config)
 
     where = L(guild_id, "ai_setup_where_channel", channel=channel.mention) if channel else L(guild_id, "ai_setup_where_mention")
-    await interaction.response.send_message(
-        embed=base_embed(
-            L(guild_id, "ai_setup_success_title"),
-            L(guild_id, "ai_setup_success_desc", where=where),
-            color=Theme.SUCCESS,
-            guild=interaction.guild,
-        ),
-        ephemeral=True,
+    embed = base_embed(
+        L(guild_id, "ai_setup_success_title"),
+        L(guild_id, "ai_setup_success_desc", where=where),
+        color=Theme.SUCCESS,
+        guild=interaction.guild,
     )
+    if bot.user:
+        embed.set_thumbnail(url=bot.user.display_avatar.url)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @bot.tree.command(name="ai_toggle", description="Turn the AI chat system on or off for this server")
@@ -3249,4 +3266,3 @@ if __name__ == "__main__":
             logger.error("Invalid token — please check BOT_TOKEN in .env")
         except Exception:
             logger.exception("Bot stopped due to an unexpected error")
-            raise
