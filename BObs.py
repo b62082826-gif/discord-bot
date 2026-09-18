@@ -132,7 +132,7 @@ CUSTOM_EMOJI_NAMES = {
     "joobi_lips": "joobilips",
     "joobi_smile": "joobismile4",
     "joobi_thumbup2": "joobithumbup",
-    "joobi_thumbsup2": "joobithumbsup2",
+    "joobi_perfect": "joobiperfect",
     "joobi_bat": "joobibat",
     "joobi_cat": "joobicat",
     "joobi_eyebrow": "joobieyebrow2",
@@ -1514,7 +1514,7 @@ class TicketCloseView(discord.ui.View):
         await interaction.response.send_message(
             embed=base_embed(
                 L(guild_id, "ticket_closing_title"),
-                L(guild_id, "ticket_closing_desc", member=interaction.user.mention, wave=E("fun_wink", "👋")),
+                L(guild_id, "ticket_closing_desc", member=interaction.user.mention, wave=mood_emoji(True, "👋")),
                 color=Theme.WARNING,
                 guild=interaction.guild,
             )
@@ -1595,7 +1595,7 @@ class ScriptHubSelect(discord.ui.Select):
             await interaction.followup.send(
                 embed=base_embed(
                     L(guild_id, "scripthub_sent_title"),
-                    L(guild_id, "scripthub_sent_desc", label=chosen["label"], clap=E("fun_clap", "👏")),
+                    L(guild_id, "scripthub_sent_desc", label=chosen["label"], clap=mood_emoji(True, "👏")),
                     color=Theme.SUCCESS,
                     guild=interaction.guild,
                 ),
@@ -2189,7 +2189,7 @@ async def clear(interaction: discord.Interaction, amount: app_commands.Range[int
     await interaction.followup.send(
         embed=base_embed(
             L(guild_id, "clear_success_title"),
-            L(guild_id, "clear_success_desc", count=len(deleted), clap=E("fun_clap", "👏")),
+            L(guild_id, "clear_success_desc", count=len(deleted), clap=mood_emoji(True, "👏")),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -2211,6 +2211,7 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     )
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
+    embed.title = f"{embed.title} {mood_emoji(False)}"
     await interaction.response.send_message(embed=embed)
     try:
         dm_embed = base_embed(
@@ -2253,6 +2254,7 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
     )
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
+    embed.title = f"{embed.title} {mood_emoji(False)}"
     await interaction.response.send_message(embed=embed)
 
 
@@ -2283,6 +2285,7 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
     )
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
+    embed.title = f"{embed.title} {mood_emoji(False)}"
     await interaction.response.send_message(embed=embed)
 
 
@@ -2314,6 +2317,7 @@ async def timeout(interaction: discord.Interaction, member: discord.Member, minu
     )
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.add_field(name=L(guild_id, "warn_reason_field"), value=reason, inline=False)
+    embed.title = f"{embed.title} {mood_emoji(False)}"
     await interaction.response.send_message(embed=embed)
 
 
@@ -2329,7 +2333,7 @@ async def addrole(interaction: discord.Interaction, member: discord.Member, role
     await member.add_roles(role)
     embed = base_embed(
         L(guild_id, "addrole_success_title"),
-        L(guild_id, "addrole_success_desc", role=role.mention, member=member.mention, thumbsup=E("fun_thumbsup", "👍")),
+        L(guild_id, "addrole_success_desc", role=role.mention, member=member.mention, thumbsup=mood_emoji(True, "👍")),
         color=Theme.SUCCESS,
         guild=interaction.guild,
     )
@@ -2345,7 +2349,7 @@ async def removerole(interaction: discord.Interaction, member: discord.Member, r
     await member.remove_roles(role)
     embed = base_embed(
         L(guild_id, "removerole_success_title"),
-        L(guild_id, "removerole_success_desc", role=role.mention, member=member.mention, ohno=E("fun_ohno", "😅")),
+        L(guild_id, "removerole_success_desc", role=role.mention, member=member.mention, ohno=mood_emoji(False, "😅")),
         color=Theme.WARNING,
         guild=interaction.guild,
     )
@@ -2361,7 +2365,7 @@ async def nick(interaction: discord.Interaction, member: discord.Member, new_nic
     await member.edit(nick=new_nick)
     embed = base_embed(
         L(guild_id, "nick_success_title"),
-        L(guild_id, "nick_success_desc", member=member.mention, nick=new_nick, laughter=E("fun_laughter", "😂")),
+        L(guild_id, "nick_success_desc", member=member.mention, nick=new_nick, laughter=mood_emoji(True, "😂")),
         color=Theme.SUCCESS,
         guild=interaction.guild,
     )
@@ -3100,7 +3104,7 @@ async def poll(interaction: discord.Interaction, question: str):
     guild_id = interaction.guild.id
     embed = base_embed(
         L(guild_id, "poll_title"),
-        L(guild_id, "poll_desc", question=question, divider=Theme.DIVIDER, gamer=E("fun_gamer", "🎮")),
+        L(guild_id, "poll_desc", question=question, divider=Theme.DIVIDER, gamer=mood_emoji(True, "🎮")),
         color=Theme.INFO,
         guild=interaction.guild,
     )
@@ -3119,7 +3123,7 @@ async def say(interaction: discord.Interaction, message: str):
     await interaction.response.send_message(
         embed=base_embed(
             L(guild_id, "say_sent_title"),
-            L(guild_id, "say_sent_desc", wink=E("fun_wink", "😉")),
+            L(guild_id, "say_sent_desc", wink=mood_emoji(True, "😉")),
             color=Theme.SUCCESS,
             guild=interaction.guild,
         ),
@@ -3193,6 +3197,50 @@ async def user_lookup(interaction: discord.Interaction, username: str):
         embed.set_thumbnail(url=avatar_url)
 
     await interaction.followup.send(embed=embed, view=RolimonsProfileView(user_id))
+
+
+@bot.tree.command(name="emojis", description="View all of the bot's custom badge/status emoji")
+async def emojis_command(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    embed = base_embed(
+        "🎨 Custom emoji set",
+        "อิโมจิที่บอทใช้ประกอบข้อความต่าง ๆ ทั้งหมด",
+        color=Theme.PRIMARY,
+        guild=interaction.guild,
+    )
+
+    groups = [
+        ("✅ Status & verification", [
+            "success", "check", "verified", "not_verified", "certified",
+            "warning", "error", "info", "lock",
+        ]),
+        ("⭐ Stars & hearts", [
+            "star", "star_shiny", "star_outline", "heart", "heart_outline",
+            "heart_exclaim", "thumbsup", "arrow",
+        ]),
+        ("🛡️ Staff & moderation", [
+            "staff", "moderator", "blue_moderator", "mod_shield", "shield", "ticket",
+        ]),
+        ("🌐 Links & branding", [
+            "link", "web", "discord_logo", "legit", "glowing_dot",
+            "lines", "gift", "planet", "language", "illuminati",
+        ]),
+    ]
+
+    for title, keys in groups:
+        value = "  ".join(f"{E(key)} `{key}`" for key in keys)
+        embed.add_field(name=title, value=value, inline=False)
+
+    embed.add_field(
+        name="🎭 Mood pools",
+        value=(
+            f"บวก: {' '.join(E(k) for k in POSITIVE_MOOD_EMOJIS)}\n"
+            f"ลบ: {' '.join(E(k) for k in NEGATIVE_MOOD_EMOJIS)}"
+        ),
+        inline=False,
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @bot.tree.command(name="help", description="Show all available commands")
@@ -3278,6 +3326,34 @@ import sqlite3
 fun_logger = logging.getLogger("bobbot.fun")
 
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "bobbot.db"))
+
+# ---------------------------------------------------------
+# Mood emoji pools — every "fun_ / joobi_ / pepe_" custom emoji lives in
+# exactly one of these two lists, so E()+random.choice() actually renders
+# each one somewhere in the bot instead of sitting unused in the dict.
+# ---------------------------------------------------------
+POSITIVE_MOOD_EMOJIS = [
+    "fun_clap", "fun_love", "fun_wow", "fun_perfect", "fun_thumbsup", "fun_laughter",
+    "fun_ok", "fun_banger", "fun_gamer", "fun_crewmate", "fun_wink",
+    "joobi_stars", "joobi_ha", "joobi_smile", "joobi_thumbup2", "joobi_perfect",
+    "joobi_bat", "joobi_cat", "joobi_eyebrow",
+    "pepe_happy", "pepe_hehe", "pepe_chair", "pepe_uwu", "pepe_plain",
+    "pepe_komo", "pepe_eu", "pepe_oooo", "pepe_rich",
+    "mlady", "crazy_happy", "stingray",
+]
+
+NEGATIVE_MOOD_EMOJIS = [
+    "fun_nervous", "fun_cry", "fun_tears", "fun_ohno", "fun_huh",
+    "fun_thumbsdown", "fun_rage", "fun_stare",
+    "joobi_peeved", "joobi_frustrated", "joobi_say_again", "joobi_think",
+    "joobi_cry", "joobi_point_laugh", "joobi_lips",
+]
+
+
+def mood_emoji(positive: bool, fallback: str = "✨") -> str:
+    """สุ่มอิโมจิอารมณ์บวก/ลบตัวหนึ่งจาก pool ด้านบน"""
+    pool = POSITIVE_MOOD_EMOJIS if positive else NEGATIVE_MOOD_EMOJIS
+    return E(random.choice(pool), fallback)
 
 _fun_conn: sqlite3.Connection | None = None
 _fun_db_lock = threading.Lock()
@@ -3585,7 +3661,7 @@ async def fun_handle_message_xp(message: discord.Message) -> None:
             "level_up_desc",
             member=message.author.mention,
             level=level,
-            star=E("fun_perfect", "🎉"),
+            star=mood_emoji(True, "🎉"),
         ),
         color=Theme.SUCCESS,
         guild=message.guild,
@@ -3757,7 +3833,7 @@ async def finish_giveaway(gw: dict, reroll: bool = False) -> None:
 
     embed = base_embed(
         L(guild.id, "gw_result_reroll_title" if reroll else "gw_result_title"),
-        L(guild.id, "gw_result_desc", prize=gw["prize"], winners=mentions, clap=E("fun_clap", "🎊")),
+        L(guild.id, "gw_result_desc", prize=gw["prize"], winners=mentions, clap=mood_emoji(True, "🎊")),
         color=Theme.SUCCESS,
         guild=guild,
     )
