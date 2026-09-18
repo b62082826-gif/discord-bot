@@ -97,6 +97,8 @@ CUSTOM_EMOJI_NAMES = {
     "lines": "lines",
     "gift": "giftingpatron",
     "language": "blueplanet",
+    "heart_exclaim": "blueheartexclaim",
+    "illuminati": "illuminaticonfirmed",
 
     "fun_clap": "pepeclap",
     "fun_love": "pepeheart",
@@ -104,10 +106,12 @@ CUSTOM_EMOJI_NAMES = {
     "fun_wow": "pepewow",
     "fun_perfect": "pepeperfect",
     "fun_cry": "crying",
+    "fun_tears": "tears",
     "fun_ohno": "joobiohno",
     "fun_huh": "joobihuh",
     "fun_wink": "joobiwink2",
     "fun_thumbsup": "joobithumbsup",
+    "fun_thumbsdown": "joobithumbsdown",
     "fun_laughter": "joobilaughter",
     "fun_rage": "raiva",
     "fun_ok": "pepeok",
@@ -115,6 +119,37 @@ CUSTOM_EMOJI_NAMES = {
     "fun_banger": "pepebanger",
     "fun_gamer": "gamer",
     "fun_crewmate": "bluecrewmate",
+
+    # ----- new Joobi set -----
+    "joobi_stars": "joobistars",
+    "joobi_peeved": "joobipeeved",
+    "joobi_frustrated": "joobifrustrated",
+    "joobi_say_again": "joobisaythatagain",
+    "joobi_think": "joobithink",
+    "joobi_cry": "joobicry3",
+    "joobi_ha": "joobiha",
+    "joobi_point_laugh": "joobipointandlaugh",
+    "joobi_lips": "joobilips",
+    "joobi_smile": "joobismile4",
+    "joobi_thumbup2": "joobithumbup",
+    "joobi_thumbsup2": "joobithumbsup2",
+    "joobi_bat": "joobibat",
+    "joobi_cat": "joobicat",
+    "joobi_eyebrow": "joobieyebrow2",
+
+    # ----- new Pepe / misc set -----
+    "pepe_oooo": "oooo",
+    "pepe_eu": "eu",
+    "pepe_rich": "peperich",
+    "pepe_komo": "komooo",
+    "pepe_happy": "pepehappy",
+    "pepe_hehe": "hehehe",
+    "pepe_chair": "pepechair",
+    "pepe_uwu": "pepeuwu",
+    "pepe_plain": "pepe",
+    "mlady": "mlady",
+    "crazy_happy": "crazyhappy",
+    "stingray": "stingrayyy",
 }
 
 custom_emoji_cache: dict[str, "discord.Emoji"] = {}
@@ -176,11 +211,6 @@ def base_embed(
 # =========================================================
 # Rules text auto-formatter
 # =========================================================
-# Admins often paste rules as one flat paragraph like:
-#   "1. Respect everyone Treat others with kindness. 2. Do not post ..."
-# This detects a sequential numbered list embedded in the text (even
-# without any line breaks) and rewrites it as one bolded item per line,
-# separated by blank lines, so it always renders readably in Discord.
 _RULES_NUMBER_PATTERN = re.compile(r"(?:(?<=^)|(?<=\s))(\d{1,2})\.\s+")
 
 
@@ -188,8 +218,6 @@ def format_rules_content(text: str) -> str:
     if not text:
         return text
 
-    # Already has explicit numbered lines -> assume the admin formatted it
-    # on purpose and leave it alone.
     if re.search(r"(?:\r?\n)\s*\d{1,2}\.\s", text):
         return text
 
@@ -198,9 +226,6 @@ def format_rules_content(text: str) -> str:
         return text
 
     numbers = [int(m.group(1)) for m in matches]
-    # Only treat this as a numbered list if it starts at 1 (or 0) and the
-    # numbers are non-decreasing — avoids mangling text that just happens
-    # to contain "24." somewhere in the middle.
     if numbers[0] not in (0, 1):
         return text
     if any(numbers[i] > numbers[i + 1] for i in range(len(numbers) - 1)):
@@ -224,8 +249,6 @@ def format_rules_content(text: str) -> str:
 LANGUAGE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "language_config.json")
 DEFAULT_LANGUAGE = "en"
 
-# Add more languages here any time — just add a new top-level key to
-# TRANSLATIONS with the same set of keys, and register it below.
 AVAILABLE_LANGUAGES = {
     "en": {"name": "English", "flag": "🇬🇧"},
     "th": {"name": "ไทย", "flag": "🇹🇭"},
@@ -248,7 +271,6 @@ def save_language_config(config: dict) -> None:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
-# Structure: { "guild_id": "en" | "th" | ... }
 language_config = load_language_config()
 
 
@@ -263,7 +285,6 @@ def set_guild_language(guild_id, lang_code: str) -> None:
 
 TRANSLATIONS = {
     "en": {
-        # verify
         "verify_not_configured_title": "Not configured yet",
         "verify_not_configured_desc": "❌ This server hasn't set up a verification role yet.\nAsk an admin to run `/setupverify`.",
         "verify_role_missing_title": "Role not found",
@@ -282,7 +303,6 @@ TRANSLATIONS = {
         "verify_setup_sending": "Sending the verification message...",
         "verify_button_label": "Verify",
 
-        # ticket
         "ticket_not_configured_title": "Not configured yet",
         "ticket_not_configured_desc": "❌ The ticket system isn't set up. Ask an admin to run `/setupticket`.",
         "ticket_category_missing_title": "Category not found",
@@ -313,7 +333,6 @@ TRANSLATIONS = {
         "ticket_open_button": "Open ticket",
         "ticket_close_button": "Close ticket",
 
-        # scripthub
         "scripthub_empty_title": "Nothing here yet",
         "scripthub_empty_desc": "❌ No items are available yet. Ask an admin to add one with `/scripthub_additem`.",
         "scripthub_item_missing_title": "Item not found",
@@ -361,7 +380,6 @@ TRANSLATIONS = {
         "scripthub_kind_file": "📎 File",
         "scripthub_kind_text": "💬 Text",
 
-        # AI system
         "ai_no_key_configured": "❌ GROQ_API_KEY hasn't been set on the server running this bot. Please ask the bot admin to set it in .env",
         "ai_rate_limited": "⏳ The AI is receiving too many requests right now. Please try again in a moment",
         "ai_generic_error": "❌ Couldn't reach the AI right now. Please try again",
@@ -385,7 +403,6 @@ TRANSLATIONS = {
             "instead of making things up, and avoid inappropriate content."
         ),
 
-        # settings / language
         "settings_title": "⚙️ Server settings",
         "settings_desc": "Pick the language the bot should use for its messages in this server.\nCurrent language: **{current}**",
         "settings_select_placeholder": "🌐 Choose a language...",
@@ -394,7 +411,6 @@ TRANSLATIONS = {
         "settings_no_permission_title": "No permission",
         "settings_no_permission_desc": "❌ You need the Manage Server permission to change this.",
 
-        # rules
         "rules_setup_success_title": "Setup successful ✅",
         "rules_setup_sending": "Sending the rules panel...",
         "rules_setup_empty_note": "No languages added yet — use `/rules_edit` to add your first one.",
@@ -430,7 +446,6 @@ TRANSLATIONS = {
         "rules_modal_field_image_url": "Image URL",
         "rules_modal_field_thumbnail_url": "Thumbnail URL",
 
-        # moderation & general (used across commands)
         "clear_success_title": "Messages cleared 🧹",
         "clear_success_desc": "Deleted **{count}** message(s), nice and tidy {clap}",
         "warn_title": "⚠️ Warning",
@@ -458,7 +473,6 @@ TRANSLATIONS = {
         "nick_success_title": "Nickname changed ✏️",
         "nick_success_desc": "{member}'s nickname is now **{nick}** {laughter}",
 
-        # role menu
         "rolemenu_created_sending": "Creating the role menu...",
         "rolemenu_created_note": "✅ Menu created. Use `/rolemenu_add message_id:{id}` to add role options",
         "rolemenu_role_too_high_title": "Role too high",
@@ -477,7 +491,6 @@ TRANSLATIONS = {
         "rolemenu_option_removed_desc": "Removed {emoji} from the menu",
         "rolemenu_role_deleted": "(role deleted)",
 
-        # general commands
         "ping_pong_title": "🏓 Pong!",
         "ping_pong_desc": "Current bot latency is **{ms}ms** {mood}",
         "userinfo_title": "👤 {member}'s info",
@@ -508,7 +521,6 @@ TRANSLATIONS = {
         "user_lookup_no_data": "No data",
         "user_lookup_footer": "Stats updated a few seconds ago, refresh stats by visiting the profile page",
 
-        # help
         "help_title": "📖 All BOB_BOT commands",
         "help_desc": "All commands available on this server",
         "help_moderation": "🛡️ Moderation",
@@ -526,7 +538,6 @@ TRANSLATIONS = {
         "help_settings": "⚙️ Settings",
         "help_settings_desc": "`/settings` — choose the language the bot replies in on this server",
 
-        # errors
         "error_no_permission": "❌ You don't have permission to use this command",
         "error_generic_title": "Something went wrong",
         "error_generic_desc": "❌ An error occurred while running this command. Please try again",
@@ -1049,10 +1060,6 @@ def save_rules_config(config: dict) -> None:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
-# Structure: { "guild_id": {
-#   "channel_id": int, "message_id": int,
-#   "sections": [ {"code": "EN", "name": "English", "color": int, "content": str} ]
-# } }
 rules_config = load_rules_config()
 
 
@@ -2006,6 +2013,8 @@ async def on_ready():
         except (ValueError, TypeError):
             logger.warning(f"Failed to register scripthub panel for guild {guild_id_str}")
 
+    await fun_on_bot_ready()
+
     if not update_status.is_running():
         update_status.start()
 
@@ -2026,6 +2035,8 @@ async def on_message(message: discord.Message):
 
     if message.author.bot or not message.guild:
         return
+
+    await fun_handle_message_xp(message)
 
     guild_id = message.guild.id
     conf = ai_config.get(str(guild_id))
@@ -3225,6 +3236,9 @@ async def help_command(interaction: discord.Interaction):
         value="`/rules_setup`\n`/rules_edit`\n`/rules_removesection`\n`/rules_listsections`",
         inline=False,
     )
+    embed.add_field(name=L(guild_id, "help_level"), value="`/level`\n`/leaderboard`\n`/level_setup`\n`/level_reward_add`\n`/level_reward_remove`\n`/level_rewards`\n`/level_addxp`\n`/level_reset`", inline=False)
+    embed.add_field(name=L(guild_id, "help_giveaway"), value="`/giveaway_start`\n`/giveaway_end`\n`/giveaway_reroll`\n`/giveaway_list`", inline=False)
+    embed.add_field(name=L(guild_id, "help_suggestion"), value="`/suggest`\n`/suggestion_setup`\n`/suggestion_approve`\n`/suggestion_deny`", inline=False)
     embed.add_field(name=L(guild_id, "help_settings"), value=L(guild_id, "help_settings_desc"), inline=False)
     await interaction.response.send_message(embed=embed)
 
@@ -3250,6 +3264,1515 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         await interaction.followup.send(embed=embed, ephemeral=True)
     else:
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+# =========================================================
+# =========================================================
+#   FUN SYSTEMS: Level/XP, Giveaway, Suggestion (SQLite-backed)
+# =========================================================
+# =========================================================
+import random
+import sqlite3
+
+fun_logger = logging.getLogger("bobbot.fun")
+
+DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "bobbot.db"))
+
+_fun_conn: sqlite3.Connection | None = None
+_fun_db_lock = threading.Lock()
+
+FUN_SCHEMA = """
+CREATE TABLE IF NOT EXISTS level_config (
+    guild_id        TEXT PRIMARY KEY,
+    enabled         INTEGER NOT NULL DEFAULT 1,
+    announce_channel_id TEXT,
+    xp_min          INTEGER NOT NULL DEFAULT 15,
+    xp_max          INTEGER NOT NULL DEFAULT 25,
+    cooldown        INTEGER NOT NULL DEFAULT 60,
+    stack_roles     INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS levels (
+    guild_id    TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    xp          INTEGER NOT NULL DEFAULT 0,
+    level       INTEGER NOT NULL DEFAULT 0,
+    total_xp    INTEGER NOT NULL DEFAULT 0,
+    messages    INTEGER NOT NULL DEFAULT 0,
+    last_gain   REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS level_rewards (
+    guild_id    TEXT NOT NULL,
+    level       INTEGER NOT NULL,
+    role_id     TEXT NOT NULL,
+    PRIMARY KEY (guild_id, level)
+);
+
+CREATE TABLE IF NOT EXISTS giveaways (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id         TEXT NOT NULL,
+    channel_id       TEXT NOT NULL,
+    message_id       TEXT,
+    prize            TEXT NOT NULL,
+    winners          INTEGER NOT NULL DEFAULT 1,
+    host_id          TEXT NOT NULL,
+    required_role_id TEXT,
+    end_ts           REAL NOT NULL,
+    ended            INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS giveaway_entries (
+    giveaway_id INTEGER NOT NULL,
+    user_id     TEXT NOT NULL,
+    PRIMARY KEY (giveaway_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS suggestion_config (
+    guild_id          TEXT PRIMARY KEY,
+    channel_id        TEXT NOT NULL,
+    review_channel_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS suggestions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id    TEXT NOT NULL,
+    channel_id  TEXT NOT NULL,
+    message_id  TEXT,
+    author_id   TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    staff_id    TEXT,
+    reason      TEXT,
+    created_ts  REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS suggestion_votes (
+    suggestion_id INTEGER NOT NULL,
+    user_id       TEXT NOT NULL,
+    vote          INTEGER NOT NULL,
+    PRIMARY KEY (suggestion_id, user_id)
+);
+"""
+
+
+def _fun_init_db() -> None:
+    global _fun_conn
+    _fun_conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    _fun_conn.row_factory = sqlite3.Row
+    with _fun_db_lock:
+        _fun_conn.execute("PRAGMA journal_mode=WAL")
+        _fun_conn.executescript(FUN_SCHEMA)
+        _fun_conn.commit()
+    fun_logger.info(f"SQLite (fun systems) ready at {DB_PATH}")
+
+
+def _fun_query(sql: str, params: tuple = (), fetch: str | None = None):
+    with _fun_db_lock:
+        cur = _fun_conn.execute(sql, params)
+        result = None
+        if fetch == "one":
+            result = cur.fetchone()
+        elif fetch == "all":
+            result = cur.fetchall()
+        elif fetch == "id":
+            result = cur.lastrowid
+        _fun_conn.commit()
+        return result
+
+
+async def fq(sql: str, params: tuple = (), fetch: str | None = None):
+    """รัน SQL ของระบบ fun แบบไม่บล็อก event loop"""
+    return await asyncio.to_thread(_fun_query, sql, params, fetch)
+
+
+def xp_needed(level: int) -> int:
+    """XP ที่ต้องใช้เพื่อขึ้นจากเลเวลนี้ไปเลเวลถัดไป (สูตรทรงเดียวกับ MEE6)"""
+    return 5 * (level ** 2) + 50 * level + 100
+
+
+def progress_bar(current: int, needed: int, size: int = 12) -> str:
+    ratio = 0 if needed <= 0 else min(max(current / needed, 0), 1)
+    filled = int(size * ratio)
+    return "█" * filled + "░" * (size - filled)
+
+
+_DURATION_PATTERN = re.compile(r"(\d+)\s*([smhdw])", re.IGNORECASE)
+_DURATION_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+
+
+def parse_duration(text: str) -> int | None:
+    """'10m' -> 600, '1d12h' -> 129600, '90' -> 90 (วินาที). คืน None ถ้าอ่านไม่ออก"""
+    if not text:
+        return None
+    text = text.strip().lower()
+    if text.isdigit():
+        return int(text)
+    total = 0
+    matched = False
+    for amount, unit in _DURATION_PATTERN.findall(text):
+        total += int(amount) * _DURATION_UNITS[unit]
+        matched = True
+    return total if matched and total > 0 else None
+
+
+def fmt_duration(seconds: int) -> str:
+    seconds = int(max(seconds, 0))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if secs and not days:
+        parts.append(f"{secs}s")
+    return " ".join(parts) or "0s"
+
+
+# ---------------------------------------------------------
+# Level / XP system
+# ---------------------------------------------------------
+DEFAULT_LEVEL_CONFIG = {
+    "enabled": 1,
+    "announce_channel_id": None,
+    "xp_min": 15,
+    "xp_max": 25,
+    "cooldown": 60,
+    "stack_roles": 1,
+}
+
+
+async def get_level_config(guild_id) -> dict:
+    row = await fq("SELECT * FROM level_config WHERE guild_id = ?", (str(guild_id),), fetch="one")
+    if row is None:
+        return dict(DEFAULT_LEVEL_CONFIG)
+    return dict(row)
+
+
+async def get_level_row(guild_id, user_id) -> dict:
+    row = await fq(
+        "SELECT * FROM levels WHERE guild_id = ? AND user_id = ?",
+        (str(guild_id), str(user_id)),
+        fetch="one",
+    )
+    if row is None:
+        return {"xp": 0, "level": 0, "total_xp": 0, "messages": 0, "last_gain": 0.0}
+    return dict(row)
+
+
+async def get_user_rank(guild_id, user_id) -> int:
+    row = await fq(
+        """
+        SELECT COUNT(*) + 1 AS rank FROM levels
+        WHERE guild_id = ? AND total_xp > (
+            SELECT total_xp FROM levels WHERE guild_id = ? AND user_id = ?
+        )
+        """,
+        (str(guild_id), str(guild_id), str(user_id)),
+        fetch="one",
+    )
+    return row["rank"] if row else 1
+
+
+async def apply_level_rewards(member: discord.Member, new_level: int, stack: bool) -> list:
+    """แจกยศตามเลเวล คืนลิสต์ยศที่เพิ่งได้"""
+    rows = await fq(
+        "SELECT level, role_id FROM level_rewards WHERE guild_id = ? ORDER BY level ASC",
+        (str(member.guild.id),),
+        fetch="all",
+    ) or []
+    if not rows:
+        return []
+
+    earned = [r for r in rows if r["level"] <= new_level]
+    if not earned:
+        return []
+
+    to_add, to_remove = [], []
+    if stack:
+        for r in earned:
+            role = member.guild.get_role(int(r["role_id"]))
+            if role and role not in member.roles:
+                to_add.append(role)
+    else:
+        highest = earned[-1]
+        role = member.guild.get_role(int(highest["role_id"]))
+        if role and role not in member.roles:
+            to_add.append(role)
+        for r in earned[:-1]:
+            old = member.guild.get_role(int(r["role_id"]))
+            if old and old in member.roles:
+                to_remove.append(old)
+
+    try:
+        if to_add:
+            await member.add_roles(*to_add, reason=f"Level {new_level} reward")
+        if to_remove:
+            await member.remove_roles(*to_remove, reason="Level reward replaced")
+    except discord.Forbidden:
+        fun_logger.warning(f"ไม่มีสิทธิ์แจกยศเลเวลให้ {member} ใน {member.guild}")
+        return []
+    return to_add
+
+
+async def fun_handle_message_xp(message: discord.Message) -> None:
+    """เรียกจาก on_message — เพิ่ม XP + เช็คเลเวลอัป"""
+    if message.author.bot or not message.guild:
+        return
+    if message.content.startswith(("!", "/")):
+        return
+
+    guild_id = str(message.guild.id)
+    user_id = str(message.author.id)
+
+    conf = await get_level_config(guild_id)
+    if not conf.get("enabled", 1):
+        return
+
+    row = await get_level_row(guild_id, user_id)
+    now = datetime.datetime.now(timezone.utc).timestamp()
+    if now - (row["last_gain"] or 0) < conf["cooldown"]:
+        await fq(
+            """
+            INSERT INTO levels (guild_id, user_id, messages) VALUES (?, ?, 1)
+            ON CONFLICT(guild_id, user_id) DO UPDATE SET messages = messages + 1
+            """,
+            (guild_id, user_id),
+        )
+        return
+
+    gain = random.randint(conf["xp_min"], conf["xp_max"])
+    xp = row["xp"] + gain
+    level = row["level"]
+    leveled_up = False
+
+    while xp >= xp_needed(level):
+        xp -= xp_needed(level)
+        level += 1
+        leveled_up = True
+
+    await fq(
+        """
+        INSERT INTO levels (guild_id, user_id, xp, level, total_xp, messages, last_gain)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT(guild_id, user_id) DO UPDATE SET
+            xp = ?, level = ?, total_xp = total_xp + ?, messages = messages + 1, last_gain = ?
+        """,
+        (guild_id, user_id, xp, level, gain, now, xp, level, gain, now),
+    )
+
+    if not leveled_up:
+        return
+
+    new_roles = await apply_level_rewards(message.author, level, bool(conf.get("stack_roles", 1)))
+
+    channel = message.channel
+    if conf.get("announce_channel_id"):
+        found = message.guild.get_channel(int(conf["announce_channel_id"]))
+        if found:
+            channel = found
+
+    embed = base_embed(
+        L(message.guild.id, "level_up_title"),
+        L(
+            message.guild.id,
+            "level_up_desc",
+            member=message.author.mention,
+            level=level,
+            star=E("fun_perfect", "🎉"),
+        ),
+        color=Theme.SUCCESS,
+        guild=message.guild,
+    )
+    embed.set_thumbnail(url=message.author.display_avatar.url)
+    if new_roles:
+        embed.add_field(
+            name=L(message.guild.id, "level_reward_field"),
+            value=", ".join(r.mention for r in new_roles),
+            inline=False,
+        )
+    try:
+        await channel.send(embed=embed)
+    except discord.HTTPException:
+        pass
+
+
+# ---------------------------------------------------------
+# Giveaway system
+# ---------------------------------------------------------
+class GiveawayJoinView(discord.ui.View):
+    def __init__(self, giveaway_id: int, entries: int = 0):
+        super().__init__(timeout=None)
+        self.giveaway_id = giveaway_id
+        button = discord.ui.Button(
+            label=f"เข้าร่วม ({entries})" if entries else "เข้าร่วม",
+            style=discord.ButtonStyle.success,
+            emoji="🎉",
+            custom_id=f"bobbot_giveaway_join_{giveaway_id}",
+        )
+        button.callback = self.join
+        self.add_item(button)
+
+    async def join(self, interaction: discord.Interaction):
+        guild_id = interaction.guild.id
+        row = await fq("SELECT * FROM giveaways WHERE id = ?", (self.giveaway_id,), fetch="one")
+
+        if row is None or row["ended"]:
+            await interaction.response.send_message(
+                embed=base_embed(
+                    L(guild_id, "gw_ended_title"),
+                    L(guild_id, "gw_ended_desc"),
+                    color=Theme.WARNING,
+                    guild=interaction.guild,
+                ),
+                ephemeral=True,
+            )
+            return
+
+        if row["required_role_id"]:
+            required = interaction.guild.get_role(int(row["required_role_id"]))
+            if required and required not in interaction.user.roles:
+                await interaction.response.send_message(
+                    embed=base_embed(
+                        L(guild_id, "gw_need_role_title"),
+                        L(guild_id, "gw_need_role_desc", role=required.mention),
+                        color=Theme.DANGER,
+                        guild=interaction.guild,
+                    ),
+                    ephemeral=True,
+                )
+                return
+
+        existing = await fq(
+            "SELECT 1 FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ?",
+            (self.giveaway_id, str(interaction.user.id)),
+            fetch="one",
+        )
+        if existing:
+            await fq(
+                "DELETE FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ?",
+                (self.giveaway_id, str(interaction.user.id)),
+            )
+            joined = False
+        else:
+            await fq(
+                "INSERT INTO giveaway_entries (giveaway_id, user_id) VALUES (?, ?)",
+                (self.giveaway_id, str(interaction.user.id)),
+            )
+            joined = True
+
+        count = await count_entries(self.giveaway_id)
+        try:
+            embed = await build_giveaway_embed(interaction.guild, dict(row), count)
+            await interaction.response.edit_message(embed=embed, view=GiveawayJoinView(self.giveaway_id, count))
+        except discord.HTTPException:
+            await interaction.response.defer(ephemeral=True)
+
+        key = "gw_joined_desc" if joined else "gw_left_desc"
+        await interaction.followup.send(
+            embed=base_embed(
+                L(guild_id, "gw_joined_title" if joined else "gw_left_title"),
+                L(guild_id, key, count=count),
+                color=Theme.SUCCESS if joined else Theme.WARNING,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+
+
+async def count_entries(giveaway_id: int) -> int:
+    row = await fq(
+        "SELECT COUNT(*) AS c FROM giveaway_entries WHERE giveaway_id = ?",
+        (giveaway_id,),
+        fetch="one",
+    )
+    return row["c"] if row else 0
+
+
+async def build_giveaway_embed(guild: discord.Guild, gw: dict, entries: int) -> discord.Embed:
+    host = guild.get_member(int(gw["host_id"]))
+    embed = base_embed(
+        L(guild.id, "gw_panel_title", prize=gw["prize"]),
+        L(
+            guild.id,
+            "gw_panel_desc",
+            end=f"<t:{int(gw['end_ts'])}:R>",
+            end_full=f"<t:{int(gw['end_ts'])}:f>",
+            divider=Theme.DIVIDER,
+        ),
+        color=Theme.PRIMARY,
+        guild=guild,
+    )
+    embed.add_field(name=L(guild.id, "gw_winners_field"), value=f"**{gw['winners']}**", inline=True)
+    embed.add_field(name=L(guild.id, "gw_entries_field"), value=f"**{entries}**", inline=True)
+    embed.add_field(
+        name=L(guild.id, "gw_host_field"),
+        value=host.mention if host else f"<@{gw['host_id']}>",
+        inline=True,
+    )
+    if gw.get("required_role_id"):
+        role = guild.get_role(int(gw["required_role_id"]))
+        if role:
+            embed.add_field(name=L(guild.id, "gw_required_field"), value=role.mention, inline=False)
+    return embed
+
+
+async def finish_giveaway(gw: dict, reroll: bool = False) -> None:
+    guild = bot.get_guild(int(gw["guild_id"]))
+    if not guild:
+        return
+    channel = guild.get_channel(int(gw["channel_id"]))
+    if not channel:
+        return
+
+    rows = await fq(
+        "SELECT user_id FROM giveaway_entries WHERE giveaway_id = ?",
+        (gw["id"],),
+        fetch="all",
+    ) or []
+    entrants = [r["user_id"] for r in rows]
+
+    if not reroll:
+        await fq("UPDATE giveaways SET ended = 1 WHERE id = ?", (gw["id"],))
+
+    if not entrants:
+        await channel.send(
+            embed=base_embed(
+                L(guild.id, "gw_no_entries_title"),
+                L(guild.id, "gw_no_entries_desc", prize=gw["prize"]),
+                color=Theme.WARNING,
+                guild=guild,
+            )
+        )
+        return
+
+    winners = random.sample(entrants, k=min(gw["winners"], len(entrants)))
+    mentions = ", ".join(f"<@{w}>" for w in winners)
+
+    embed = base_embed(
+        L(guild.id, "gw_result_reroll_title" if reroll else "gw_result_title"),
+        L(guild.id, "gw_result_desc", prize=gw["prize"], winners=mentions, clap=E("fun_clap", "🎊")),
+        color=Theme.SUCCESS,
+        guild=guild,
+    )
+    embed.add_field(name=L(guild.id, "gw_entries_field"), value=f"**{len(entrants)}**", inline=True)
+
+    jump = None
+    if gw.get("message_id"):
+        try:
+            msg = await channel.fetch_message(int(gw["message_id"]))
+            jump = msg.jump_url
+            closed = await build_giveaway_embed(guild, gw, len(entrants))
+            closed.color = Theme.DANGER
+            closed.title = L(guild.id, "gw_closed_title", prize=gw["prize"])
+            closed.add_field(name=L(guild.id, "gw_winner_field"), value=mentions, inline=False)
+            await msg.edit(embed=closed, view=None)
+        except (discord.NotFound, discord.Forbidden):
+            pass
+
+    if jump:
+        embed.add_field(name="\u200b", value=f"[{L(guild.id, 'gw_jump')}]({jump})", inline=False)
+
+    await channel.send(content=mentions, embed=embed)
+
+
+@tasks.loop(seconds=15)
+async def giveaway_checker():
+    try:
+        now = datetime.datetime.now(timezone.utc).timestamp()
+        rows = await fq(
+            "SELECT * FROM giveaways WHERE ended = 0 AND end_ts <= ?",
+            (now,),
+            fetch="all",
+        ) or []
+        for row in rows:
+            try:
+                await finish_giveaway(dict(row))
+            except Exception:
+                fun_logger.exception(f"จบ giveaway #{row['id']} ไม่สำเร็จ")
+                await fq("UPDATE giveaways SET ended = 1 WHERE id = ?", (row["id"],))
+    except Exception:
+        fun_logger.exception("giveaway_checker พัง")
+
+
+@giveaway_checker.before_loop
+async def _before_giveaway_checker():
+    await bot.wait_until_ready()
+
+
+# ---------------------------------------------------------
+# Suggestion system
+# ---------------------------------------------------------
+STATUS_COLORS = {"pending": "INFO", "approved": "SUCCESS", "denied": "DANGER"}
+
+
+class SuggestionVoteView(discord.ui.View):
+    def __init__(self, suggestion_id: int, up: int = 0, down: int = 0, locked: bool = False):
+        super().__init__(timeout=None)
+        self.suggestion_id = suggestion_id
+
+        up_btn = discord.ui.Button(
+            label=str(up),
+            style=discord.ButtonStyle.success,
+            emoji="👍",
+            custom_id=f"bobbot_suggest_up_{suggestion_id}",
+            disabled=locked,
+        )
+        down_btn = discord.ui.Button(
+            label=str(down),
+            style=discord.ButtonStyle.danger,
+            emoji="👎",
+            custom_id=f"bobbot_suggest_down_{suggestion_id}",
+            disabled=locked,
+        )
+        up_btn.callback = self._make_vote(1)
+        down_btn.callback = self._make_vote(-1)
+        self.add_item(up_btn)
+        self.add_item(down_btn)
+
+    def _make_vote(self, value: int):
+        async def callback(interaction: discord.Interaction):
+            await self.vote(interaction, value)
+        return callback
+
+    async def vote(self, interaction: discord.Interaction, value: int):
+        guild_id = interaction.guild.id
+        row = await fq("SELECT * FROM suggestions WHERE id = ?", (self.suggestion_id,), fetch="one")
+        if row is None or row["status"] != "pending":
+            await interaction.response.send_message(
+                embed=base_embed(
+                    L(guild_id, "sg_closed_title"),
+                    L(guild_id, "sg_closed_desc"),
+                    color=Theme.WARNING,
+                    guild=interaction.guild,
+                ),
+                ephemeral=True,
+            )
+            return
+
+        existing = await fq(
+            "SELECT vote FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?",
+            (self.suggestion_id, str(interaction.user.id)),
+            fetch="one",
+        )
+        if existing and existing["vote"] == value:
+            await fq(
+                "DELETE FROM suggestion_votes WHERE suggestion_id = ? AND user_id = ?",
+                (self.suggestion_id, str(interaction.user.id)),
+            )
+            msg_key = "sg_vote_removed"
+        else:
+            await fq(
+                """
+                INSERT INTO suggestion_votes (suggestion_id, user_id, vote) VALUES (?, ?, ?)
+                ON CONFLICT(suggestion_id, user_id) DO UPDATE SET vote = ?
+                """,
+                (self.suggestion_id, str(interaction.user.id), value, value),
+            )
+            msg_key = "sg_vote_up" if value > 0 else "sg_vote_down"
+
+        up, down = await count_votes(self.suggestion_id)
+        embed = await build_suggestion_embed(interaction.guild, dict(row), up, down)
+        try:
+            await interaction.response.edit_message(
+                embed=embed, view=SuggestionVoteView(self.suggestion_id, up, down)
+            )
+        except discord.HTTPException:
+            await interaction.response.defer(ephemeral=True)
+
+        await interaction.followup.send(
+            embed=base_embed(
+                L(guild_id, "sg_vote_title"),
+                L(guild_id, msg_key, up=up, down=down),
+                color=Theme.INFO,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+
+
+async def count_votes(suggestion_id: int) -> tuple[int, int]:
+    row = await fq(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN vote > 0 THEN 1 ELSE 0 END), 0) AS up,
+            COALESCE(SUM(CASE WHEN vote < 0 THEN 1 ELSE 0 END), 0) AS down
+        FROM suggestion_votes WHERE suggestion_id = ?
+        """,
+        (suggestion_id,),
+        fetch="one",
+    )
+    return (row["up"], row["down"]) if row else (0, 0)
+
+
+async def build_suggestion_embed(guild: discord.Guild, sug: dict, up: int, down: int) -> discord.Embed:
+    color = getattr(Theme, STATUS_COLORS.get(sug["status"], "INFO"))
+    author = guild.get_member(int(sug["author_id"]))
+
+    embed = base_embed(
+        L(guild.id, "sg_panel_title", id=sug["id"]),
+        sug["content"],
+        color=color,
+        guild=guild,
+    )
+    if author:
+        embed.set_author(name=str(author), icon_url=author.display_avatar.url)
+
+    total = up + down
+    ratio = int((up / total) * 100) if total else 0
+    embed.add_field(
+        name=L(guild.id, "sg_votes_field"),
+        value=f"👍 **{up}**  •  👎 **{down}**\n`{progress_bar(up, total or 1)}` {ratio}%",
+        inline=False,
+    )
+    embed.add_field(
+        name=L(guild.id, "sg_status_field"),
+        value=L(guild.id, f"sg_status_{sug['status']}"),
+        inline=True,
+    )
+    if sug.get("staff_id"):
+        embed.add_field(name=L(guild.id, "sg_staff_field"), value=f"<@{sug['staff_id']}>", inline=True)
+    if sug.get("reason"):
+        embed.add_field(name=L(guild.id, "sg_reason_field"), value=sug["reason"], inline=False)
+    return embed
+
+
+async def refresh_suggestion_message(guild: discord.Guild, sug: dict) -> bool:
+    if not sug.get("message_id"):
+        return False
+    channel = guild.get_channel(int(sug["channel_id"]))
+    if not channel:
+        return False
+    try:
+        msg = await channel.fetch_message(int(sug["message_id"]))
+        up, down = await count_votes(sug["id"])
+        locked = sug["status"] != "pending"
+        await msg.edit(
+            embed=await build_suggestion_embed(guild, sug, up, down),
+            view=SuggestionVoteView(sug["id"], up, down, locked=locked),
+        )
+        return True
+    except (discord.NotFound, discord.Forbidden):
+        return False
+
+
+async def review_suggestion(interaction: discord.Interaction, suggestion_id: int, status: str, reason: str | None):
+    guild_id = interaction.guild.id
+    row = await fq("SELECT * FROM suggestions WHERE id = ? AND guild_id = ?",
+                   (suggestion_id, str(guild_id)), fetch="one")
+    if row is None:
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(guild_id, "sg_not_found_title"),
+                L(guild_id, "sg_not_found_desc", id=suggestion_id),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+        return
+
+    await fq(
+        "UPDATE suggestions SET status = ?, staff_id = ?, reason = ? WHERE id = ?",
+        (status, str(interaction.user.id), reason, suggestion_id),
+    )
+    sug = dict(row)
+    sug.update({"status": status, "staff_id": str(interaction.user.id), "reason": reason})
+    await refresh_suggestion_message(interaction.guild, sug)
+
+    try:
+        author = interaction.guild.get_member(int(sug["author_id"]))
+        if author:
+            dm = base_embed(
+                L(guild_id, f"sg_dm_{status}_title"),
+                L(guild_id, "sg_dm_desc", guild=interaction.guild.name, id=suggestion_id),
+                color=Theme.SUCCESS if status == "approved" else Theme.DANGER,
+                guild=interaction.guild,
+            )
+            if reason:
+                dm.add_field(name=L(guild_id, "sg_reason_field"), value=reason, inline=False)
+            await author.send(embed=dm)
+    except (discord.Forbidden, discord.HTTPException):
+        pass
+
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "sg_reviewed_title"),
+            L(guild_id, "sg_reviewed_desc", id=suggestion_id, status=L(guild_id, f"sg_status_{status}")),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+# ---------------------------------------------------------
+# Startup hook — เรียกจาก on_ready เดิม
+# ---------------------------------------------------------
+async def fun_on_bot_ready():
+    rows = await fq("SELECT id FROM giveaways WHERE ended = 0", fetch="all") or []
+    for row in rows:
+        entries = await count_entries(row["id"])
+        bot.add_view(GiveawayJoinView(row["id"], entries))
+
+    rows = await fq("SELECT id FROM suggestions WHERE status = 'pending'", fetch="all") or []
+    for row in rows:
+        up, down = await count_votes(row["id"])
+        bot.add_view(SuggestionVoteView(row["id"], up, down))
+
+    if not giveaway_checker.is_running():
+        giveaway_checker.start()
+
+    fun_logger.info("Fun systems พร้อมใช้งาน (level / giveaway / suggestion)")
+
+
+# ---------------------------------------------------------
+# คำแปล — merge เข้า TRANSLATIONS หลัก
+# ---------------------------------------------------------
+FUN_TRANSLATIONS = {
+    "en": {
+        "level_up_title": "Level up! 🎉",
+        "level_up_desc": "{member} just reached **level {level}** {star}",
+        "level_reward_field": "🎁 New role unlocked",
+        "level_disabled_title": "Leveling is off",
+        "level_disabled_desc": "❌ The level system is disabled on this server. An admin can turn it on with `/level_setup`.",
+        "level_card_title": "📊 {member}'s rank",
+        "level_field_level": "🏆 Level",
+        "level_field_rank": "📈 Server rank",
+        "level_field_xp": "✨ XP",
+        "level_field_messages": "💬 Messages",
+        "level_progress": "Progress to level {next}",
+        "level_lb_title": "🏆 Level leaderboard",
+        "level_lb_empty": "📭 Nobody has earned XP yet — start chatting!",
+        "level_setup_title": "Level system updated ✅",
+        "level_setup_desc": "Status: **{status}**\nLevel-up messages: {channel}",
+        "level_setup_same_channel": "in the channel where the message was sent",
+        "level_reward_added_title": "Reward added ✅",
+        "level_reward_added_desc": "Members will now get {role} at **level {level}**",
+        "level_reward_removed_title": "Reward removed ✅",
+        "level_reward_removed_desc": "Removed the reward for **level {level}**",
+        "level_reward_none_title": "No rewards",
+        "level_reward_none_desc": "📭 No level rewards have been set. Add one with `/level_reward_add`.",
+        "level_reward_list_title": "🎁 Level rewards",
+        "level_reward_not_found_title": "Not found",
+        "level_reward_not_found_desc": "❌ There's no reward set for level **{level}**",
+        "level_role_too_high_title": "Role too high",
+        "level_role_too_high_desc": "❌ That role is higher than or equal to the bot's role. Move the bot's role above it first.",
+        "level_reset_title": "XP reset ✅",
+        "level_reset_member": "Reset {member}'s XP back to zero",
+        "level_reset_all": "Reset XP for **everyone** on this server",
+        "level_addxp_title": "XP granted ✅",
+        "level_addxp_desc": "Gave **{amount} XP** to {member} — now level **{level}**",
+
+        "gw_panel_title": "🎉 Giveaway: {prize}",
+        "gw_panel_desc": "Click the button below to enter!\n{divider}\nEnds {end} • {end_full}",
+        "gw_winners_field": "🏆 Winners",
+        "gw_entries_field": "👥 Entries",
+        "gw_host_field": "🎗️ Hosted by",
+        "gw_required_field": "🔒 Required role",
+        "gw_bad_duration_title": "Invalid duration",
+        "gw_bad_duration_desc": "❌ Couldn't read that duration. Try formats like `10m`, `2h`, `1d12h`.",
+        "gw_started_title": "Giveaway started ✅",
+        "gw_started_desc": "**{prize}** — ends in {duration}",
+        "gw_joined_title": "You're in! 🎉",
+        "gw_joined_desc": "You've entered the giveaway. There are now **{count}** entries.\nPress the button again to withdraw.",
+        "gw_left_title": "Entry withdrawn",
+        "gw_left_desc": "You've left the giveaway. There are now **{count}** entries.",
+        "gw_ended_title": "Giveaway is over",
+        "gw_ended_desc": "❌ This giveaway has already ended.",
+        "gw_need_role_title": "Not eligible",
+        "gw_need_role_desc": "❌ You need the {role} role to enter this giveaway.",
+        "gw_no_entries_title": "No entries 😢",
+        "gw_no_entries_desc": "Nobody entered the giveaway for **{prize}**, so there's no winner.",
+        "gw_result_title": "🎊 Giveaway ended!",
+        "gw_result_reroll_title": "🎲 New winner rolled!",
+        "gw_result_desc": "Congratulations {winners} — you won **{prize}**! {clap}",
+        "gw_closed_title": "🎉 Giveaway ended: {prize}",
+        "gw_winner_field": "🏆 Winner(s)",
+        "gw_jump": "Jump to giveaway",
+        "gw_not_found_title": "Giveaway not found",
+        "gw_not_found_desc": "❌ No giveaway was found with that message ID.",
+        "gw_already_ended_title": "Already ended",
+        "gw_already_ended_desc": "❌ That giveaway has already ended. Use `/giveaway_reroll` to draw again.",
+        "gw_force_ended_title": "Ended early ✅",
+        "gw_force_ended_desc": "The giveaway was ended and the winners drawn.",
+        "gw_reroll_title": "Rerolled ✅",
+        "gw_reroll_desc": "New winners have been drawn.",
+        "gw_list_title": "🎉 Active giveaways",
+        "gw_list_empty": "📭 There are no active giveaways right now.",
+
+        "sg_not_setup_title": "Not set up",
+        "sg_not_setup_desc": "❌ No suggestion channel has been set. Ask an admin to run `/suggestion_setup`.",
+        "sg_setup_title": "Suggestions set up ✅",
+        "sg_setup_desc": "Suggestions will be posted in {channel}",
+        "sg_panel_title": "💡 Suggestion #{id}",
+        "sg_votes_field": "🗳️ Votes",
+        "sg_status_field": "📌 Status",
+        "sg_status_pending": "⏳ Pending",
+        "sg_status_approved": "✅ Approved",
+        "sg_status_denied": "❌ Denied",
+        "sg_staff_field": "👮 Reviewed by",
+        "sg_reason_field": "📄 Reason",
+        "sg_sent_title": "Suggestion sent ✅",
+        "sg_sent_desc": "Your suggestion was posted in {channel} as **#{id}**",
+        "sg_vote_title": "Vote recorded",
+        "sg_vote_up": "👍 You voted in favour — now 👍 {up} / 👎 {down}",
+        "sg_vote_down": "👎 You voted against — now 👍 {up} / 👎 {down}",
+        "sg_vote_removed": "Your vote was removed — now 👍 {up} / 👎 {down}",
+        "sg_closed_title": "Voting closed",
+        "sg_closed_desc": "❌ This suggestion has already been reviewed, so voting is closed.",
+        "sg_not_found_title": "Not found",
+        "sg_not_found_desc": "❌ No suggestion **#{id}** was found on this server.",
+        "sg_reviewed_title": "Suggestion reviewed ✅",
+        "sg_reviewed_desc": "Suggestion **#{id}** is now: {status}",
+        "sg_dm_approved_title": "Your suggestion was approved ✅",
+        "sg_dm_denied_title": "Your suggestion was denied ❌",
+        "sg_dm_desc": "Your suggestion **#{id}** in **{guild}** has been reviewed.",
+
+        "help_level": "📊 Levels / XP",
+        "help_giveaway": "🎉 Giveaways",
+        "help_suggestion": "💡 Suggestions",
+    },
+    "th": {
+        "level_up_title": "เลเวลอัป! 🎉",
+        "level_up_desc": "{member} ขึ้นเป็น **เลเวล {level}** แล้ว {star}",
+        "level_reward_field": "🎁 ได้รับยศใหม่",
+        "level_disabled_title": "ระบบเลเวลปิดอยู่",
+        "level_disabled_desc": "❌ เซิร์ฟเวอร์นี้ปิดระบบเลเวลไว้ แจ้งแอดมินให้เปิดด้วย `/level_setup`",
+        "level_card_title": "📊 อันดับของ {member}",
+        "level_field_level": "🏆 เลเวล",
+        "level_field_rank": "📈 อันดับในเซิร์ฟ",
+        "level_field_xp": "✨ XP",
+        "level_field_messages": "💬 ข้อความ",
+        "level_progress": "ความคืบหน้าสู่เลเวล {next}",
+        "level_lb_title": "🏆 อันดับเลเวลสูงสุด",
+        "level_lb_empty": "📭 ยังไม่มีใครได้ XP เลย เริ่มคุยกันได้เลย!",
+        "level_setup_title": "อัปเดตระบบเลเวลแล้ว ✅",
+        "level_setup_desc": "สถานะ: **{status}**\nข้อความเลเวลอัป: {channel}",
+        "level_setup_same_channel": "ส่งในห้องที่พิมพ์ข้อความนั้น",
+        "level_reward_added_title": "เพิ่มรางวัลแล้ว ✅",
+        "level_reward_added_desc": "สมาชิกจะได้ยศ {role} เมื่อถึง **เลเวล {level}**",
+        "level_reward_removed_title": "ลบรางวัลแล้ว ✅",
+        "level_reward_removed_desc": "ลบรางวัลของ **เลเวล {level}** แล้ว",
+        "level_reward_none_title": "ยังไม่มีรางวัล",
+        "level_reward_none_desc": "📭 ยังไม่ได้ตั้งรางวัลเลเวล เพิ่มได้ด้วย `/level_reward_add`",
+        "level_reward_list_title": "🎁 รางวัลตามเลเวล",
+        "level_reward_not_found_title": "ไม่พบ",
+        "level_reward_not_found_desc": "❌ ไม่มีรางวัลที่ตั้งไว้สำหรับเลเวล **{level}**",
+        "level_role_too_high_title": "ยศสูงเกินไป",
+        "level_role_too_high_desc": "❌ ยศนี้สูงกว่าหรือเท่ากับยศของบอท กรุณาเลื่อนยศบอทให้สูงกว่าก่อน",
+        "level_reset_title": "รีเซ็ต XP แล้ว ✅",
+        "level_reset_member": "รีเซ็ต XP ของ {member} กลับเป็นศูนย์แล้ว",
+        "level_reset_all": "รีเซ็ต XP ของ **ทุกคน** ในเซิร์ฟเวอร์นี้แล้ว",
+        "level_addxp_title": "เพิ่ม XP แล้ว ✅",
+        "level_addxp_desc": "ให้ **{amount} XP** กับ {member} ตอนนี้อยู่เลเวล **{level}**",
+
+        "gw_panel_title": "🎉 แจกของ: {prize}",
+        "gw_panel_desc": "กดปุ่มด้านล่างเพื่อเข้าร่วม!\n{divider}\nจับรางวัล {end} • {end_full}",
+        "gw_winners_field": "🏆 จำนวนผู้ชนะ",
+        "gw_entries_field": "👥 ผู้เข้าร่วม",
+        "gw_host_field": "🎗️ จัดโดย",
+        "gw_required_field": "🔒 ยศที่ต้องมี",
+        "gw_bad_duration_title": "รูปแบบเวลาไม่ถูกต้อง",
+        "gw_bad_duration_desc": "❌ อ่านเวลาไม่ออก ลองใช้รูปแบบ `10m`, `2h`, `1d12h`",
+        "gw_started_title": "เริ่มแจกของแล้ว ✅",
+        "gw_started_desc": "**{prize}** — จับรางวัลในอีก {duration}",
+        "gw_joined_title": "เข้าร่วมแล้ว! 🎉",
+        "gw_joined_desc": "คุณเข้าร่วมกิจกรรมแล้ว ตอนนี้มีผู้เข้าร่วม **{count}** คน\nกดปุ่มซ้ำอีกครั้งถ้าต้องการถอนตัว",
+        "gw_left_title": "ถอนตัวแล้ว",
+        "gw_left_desc": "คุณออกจากกิจกรรมแล้ว ตอนนี้เหลือผู้เข้าร่วม **{count}** คน",
+        "gw_ended_title": "กิจกรรมจบแล้ว",
+        "gw_ended_desc": "❌ กิจกรรมนี้จบไปแล้ว",
+        "gw_need_role_title": "ไม่มีสิทธิ์เข้าร่วม",
+        "gw_need_role_desc": "❌ คุณต้องมียศ {role} ถึงจะเข้าร่วมกิจกรรมนี้ได้",
+        "gw_no_entries_title": "ไม่มีผู้เข้าร่วม 😢",
+        "gw_no_entries_desc": "ไม่มีใครเข้าร่วมกิจกรรม **{prize}** เลย จึงไม่มีผู้ชนะ",
+        "gw_result_title": "🎊 จับรางวัลแล้ว!",
+        "gw_result_reroll_title": "🎲 สุ่มผู้ชนะใหม่!",
+        "gw_result_desc": "ยินดีด้วย {winners} คุณได้รับ **{prize}** {clap}",
+        "gw_closed_title": "🎉 จบกิจกรรม: {prize}",
+        "gw_winner_field": "🏆 ผู้ชนะ",
+        "gw_jump": "ไปที่กิจกรรม",
+        "gw_not_found_title": "ไม่พบกิจกรรม",
+        "gw_not_found_desc": "❌ ไม่พบกิจกรรมที่มี message ID นี้",
+        "gw_already_ended_title": "จบไปแล้ว",
+        "gw_already_ended_desc": "❌ กิจกรรมนี้จบไปแล้ว ถ้าอยากสุ่มใหม่ใช้ `/giveaway_reroll`",
+        "gw_force_ended_title": "จบก่อนเวลาแล้ว ✅",
+        "gw_force_ended_desc": "ปิดกิจกรรมและจับรางวัลเรียบร้อย",
+        "gw_reroll_title": "สุ่มใหม่แล้ว ✅",
+        "gw_reroll_desc": "สุ่มผู้ชนะใหม่เรียบร้อย",
+        "gw_list_title": "🎉 กิจกรรมที่กำลังเปิดอยู่",
+        "gw_list_empty": "📭 ตอนนี้ไม่มีกิจกรรมแจกของที่เปิดอยู่",
+
+        "sg_not_setup_title": "ยังไม่ได้ตั้งค่า",
+        "sg_not_setup_desc": "❌ ยังไม่ได้ตั้งห้องรับไอเดีย แจ้งแอดมินให้ใช้ `/suggestion_setup`",
+        "sg_setup_title": "ตั้งค่าระบบไอเดียแล้ว ✅",
+        "sg_setup_desc": "ไอเดียใหม่จะถูกโพสต์ที่ {channel}",
+        "sg_panel_title": "💡 ไอเดีย #{id}",
+        "sg_votes_field": "🗳️ ผลโหวต",
+        "sg_status_field": "📌 สถานะ",
+        "sg_status_pending": "⏳ รอพิจารณา",
+        "sg_status_approved": "✅ อนุมัติ",
+        "sg_status_denied": "❌ ไม่อนุมัติ",
+        "sg_staff_field": "👮 พิจารณาโดย",
+        "sg_reason_field": "📄 เหตุผล",
+        "sg_sent_title": "ส่งไอเดียแล้ว ✅",
+        "sg_sent_desc": "ไอเดียของคุณถูกโพสต์ที่ {channel} เป็นหมายเลข **#{id}**",
+        "sg_vote_title": "บันทึกโหวตแล้ว",
+        "sg_vote_up": "👍 คุณโหวตเห็นด้วย — ตอนนี้ 👍 {up} / 👎 {down}",
+        "sg_vote_down": "👎 คุณโหวตไม่เห็นด้วย — ตอนนี้ 👍 {up} / 👎 {down}",
+        "sg_vote_removed": "ยกเลิกโหวตของคุณแล้ว — ตอนนี้ 👍 {up} / 👎 {down}",
+        "sg_closed_title": "ปิดโหวตแล้ว",
+        "sg_closed_desc": "❌ ไอเดียนี้ถูกพิจารณาไปแล้ว จึงปิดการโหวต",
+        "sg_not_found_title": "ไม่พบ",
+        "sg_not_found_desc": "❌ ไม่พบไอเดีย **#{id}** ในเซิร์ฟเวอร์นี้",
+        "sg_reviewed_title": "พิจารณาไอเดียแล้ว ✅",
+        "sg_reviewed_desc": "ไอเดีย **#{id}** ตอนนี้: {status}",
+        "sg_dm_approved_title": "ไอเดียของคุณได้รับอนุมัติ ✅",
+        "sg_dm_denied_title": "ไอเดียของคุณไม่ได้รับอนุมัติ ❌",
+        "sg_dm_desc": "ไอเดีย **#{id}** ของคุณในเซิร์ฟเวอร์ **{guild}** ได้รับการพิจารณาแล้ว",
+
+        "help_level": "📊 ระบบเลเวล / XP",
+        "help_giveaway": "🎉 แจกของ",
+        "help_suggestion": "💡 เสนอไอเดีย",
+    },
+}
+
+for _lang_code, _table in FUN_TRANSLATIONS.items():
+    TRANSLATIONS.setdefault(_lang_code, {}).update(_table)
+
+
+# ---------------------------------------------------------
+# Slash commands — Level / Giveaway / Suggestion
+# ---------------------------------------------------------
+
+@bot.tree.command(name="level", description="ดูเลเวลและ XP ของตัวเองหรือคนอื่น")
+@app_commands.describe(member="สมาชิกที่ต้องการดู (เว้นว่าง = ตัวเอง)")
+async def level_cmd(interaction: discord.Interaction, member: discord.Member = None):
+    guild_id = interaction.guild.id
+    member = member or interaction.user
+
+    row = await get_level_row(guild_id, member.id)
+    rank = await get_user_rank(guild_id, member.id)
+    need = xp_needed(row["level"])
+
+    embed = base_embed(
+        L(guild_id, "level_card_title", member=member.display_name),
+        f"`{progress_bar(row['xp'], need, 16)}` **{row['xp']}/{need}**\n"
+        f"{L(guild_id, 'level_progress', next=row['level'] + 1)}",
+        color=Theme.PRIMARY,
+        guild=interaction.guild,
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(name=L(guild_id, "level_field_level"), value=f"**{row['level']}**", inline=True)
+    embed.add_field(name=L(guild_id, "level_field_rank"), value=f"**#{rank}**", inline=True)
+    embed.add_field(name=L(guild_id, "level_field_xp"), value=f"**{row['total_xp']:,}**", inline=True)
+    embed.add_field(name=L(guild_id, "level_field_messages"), value=f"**{row['messages']:,}**", inline=True)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="leaderboard", description="ดูอันดับเลเวลสูงสุดในเซิร์ฟเวอร์")
+async def leaderboard_cmd(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    rows = await fq(
+        "SELECT * FROM levels WHERE guild_id = ? ORDER BY total_xp DESC LIMIT 10",
+        (str(guild_id),),
+        fetch="all",
+    ) or []
+
+    if not rows:
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(guild_id, "level_lb_title"),
+                L(guild_id, "level_lb_empty"),
+                color=Theme.WARNING,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+        return
+
+    medals = ["🥇", "🥈", "🥉"]
+    lines = []
+    for idx, row in enumerate(rows):
+        prefix = medals[idx] if idx < 3 else f"`#{idx + 1}`"
+        member = interaction.guild.get_member(int(row["user_id"]))
+        name = member.mention if member else f"<@{row['user_id']}>"
+        lines.append(f"{prefix} {name} — **Lv.{row['level']}** • {row['total_xp']:,} XP")
+
+    embed = base_embed(
+        L(guild_id, "level_lb_title"),
+        f"{Theme.DIVIDER}\n" + "\n".join(lines),
+        color=Theme.PRIMARY,
+        guild=interaction.guild,
+    )
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="level_setup", description="เปิด/ปิดระบบเลเวล และตั้งห้องประกาศเลเวลอัป")
+@app_commands.describe(
+    enabled="เปิด (True) หรือปิด (False)",
+    announce_channel="ห้องที่จะประกาศเลเวลอัป (เว้นว่าง = ประกาศในห้องที่พิมพ์)",
+    stack_roles="สะสมยศทุกเลเวล (True) หรือเก็บแค่ยศล่าสุด (False)",
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def level_setup(
+    interaction: discord.Interaction,
+    enabled: bool = True,
+    announce_channel: discord.TextChannel = None,
+    stack_roles: bool = True,
+):
+    guild_id = interaction.guild.id
+    await fq(
+        """
+        INSERT INTO level_config (guild_id, enabled, announce_channel_id, stack_roles)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET enabled = ?, announce_channel_id = ?, stack_roles = ?
+        """,
+        (
+            str(guild_id), int(enabled),
+            str(announce_channel.id) if announce_channel else None, int(stack_roles),
+            int(enabled), str(announce_channel.id) if announce_channel else None, int(stack_roles),
+        ),
+    )
+    status = L(guild_id, "ai_toggle_on") if enabled else L(guild_id, "ai_toggle_off")
+    channel_text = announce_channel.mention if announce_channel else L(guild_id, "level_setup_same_channel")
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "level_setup_title"),
+            L(guild_id, "level_setup_desc", status=status, channel=channel_text),
+            color=Theme.SUCCESS if enabled else Theme.WARNING,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="level_reward_add", description="ตั้งยศรางวัลเมื่อถึงเลเวลที่กำหนด")
+@app_commands.describe(level="เลเวลที่ต้องถึง", role="ยศที่จะมอบให้")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def level_reward_add(interaction: discord.Interaction, level: app_commands.Range[int, 1, 500], role: discord.Role):
+    guild_id = interaction.guild.id
+    if role >= interaction.guild.me.top_role:
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(guild_id, "level_role_too_high_title"),
+                L(guild_id, "level_role_too_high_desc"),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+        return
+
+    await fq(
+        """
+        INSERT INTO level_rewards (guild_id, level, role_id) VALUES (?, ?, ?)
+        ON CONFLICT(guild_id, level) DO UPDATE SET role_id = ?
+        """,
+        (str(guild_id), level, str(role.id), str(role.id)),
+    )
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "level_reward_added_title"),
+            L(guild_id, "level_reward_added_desc", role=role.mention, level=level),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="level_reward_remove", description="ลบยศรางวัลของเลเวลหนึ่ง")
+@app_commands.describe(level="เลเวลที่ต้องการลบรางวัล")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def level_reward_remove(interaction: discord.Interaction, level: int):
+    guild_id = interaction.guild.id
+    existing = await fq(
+        "SELECT 1 FROM level_rewards WHERE guild_id = ? AND level = ?",
+        (str(guild_id), level),
+        fetch="one",
+    )
+    if not existing:
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(guild_id, "level_reward_not_found_title"),
+                L(guild_id, "level_reward_not_found_desc", level=level),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+        return
+
+    await fq("DELETE FROM level_rewards WHERE guild_id = ? AND level = ?", (str(guild_id), level))
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "level_reward_removed_title"),
+            L(guild_id, "level_reward_removed_desc", level=level),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="level_rewards", description="ดูรายการยศรางวัลตามเลเวลทั้งหมด")
+async def level_rewards(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    rows = await fq(
+        "SELECT level, role_id FROM level_rewards WHERE guild_id = ? ORDER BY level ASC",
+        (str(guild_id),),
+        fetch="all",
+    ) or []
+
+    if not rows:
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(guild_id, "level_reward_none_title"),
+                L(guild_id, "level_reward_none_desc"),
+                color=Theme.WARNING,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+        return
+
+    lines = []
+    for row in rows:
+        role = interaction.guild.get_role(int(row["role_id"]))
+        lines.append(f"**Lv.{row['level']}** → {role.mention if role else '`(ยศถูกลบ)`'}")
+
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "level_reward_list_title"),
+            "\n".join(lines),
+            color=Theme.PRIMARY,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="level_addxp", description="เพิ่ม XP ให้สมาชิก (แอดมิน)")
+@app_commands.describe(member="สมาชิก", amount="จำนวน XP ที่จะเพิ่ม")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def level_addxp(interaction: discord.Interaction, member: discord.Member, amount: app_commands.Range[int, 1, 1000000]):
+    guild_id = interaction.guild.id
+    row = await get_level_row(guild_id, member.id)
+    xp = row["xp"] + amount
+    level = row["level"]
+    while xp >= xp_needed(level):
+        xp -= xp_needed(level)
+        level += 1
+
+    await fq(
+        """
+        INSERT INTO levels (guild_id, user_id, xp, level, total_xp) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(guild_id, user_id) DO UPDATE SET xp = ?, level = ?, total_xp = total_xp + ?
+        """,
+        (str(guild_id), str(member.id), xp, level, amount, xp, level, amount),
+    )
+    conf = await get_level_config(guild_id)
+    await apply_level_rewards(member, level, bool(conf.get("stack_roles", 1)))
+
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "level_addxp_title"),
+            L(guild_id, "level_addxp_desc", amount=amount, member=member.mention, level=level),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="level_reset", description="รีเซ็ต XP ของสมาชิกคนเดียว หรือทั้งเซิร์ฟเวอร์")
+@app_commands.describe(member="สมาชิกที่จะรีเซ็ต (เว้นว่าง = รีเซ็ตทั้งเซิร์ฟเวอร์)")
+@app_commands.checks.has_permissions(administrator=True)
+async def level_reset(interaction: discord.Interaction, member: discord.Member = None):
+    guild_id = interaction.guild.id
+    if member:
+        await fq(
+            "DELETE FROM levels WHERE guild_id = ? AND user_id = ?",
+            (str(guild_id), str(member.id)),
+        )
+        desc = L(guild_id, "level_reset_member", member=member.mention)
+    else:
+        await fq("DELETE FROM levels WHERE guild_id = ?", (str(guild_id),))
+        desc = L(guild_id, "level_reset_all")
+
+    await interaction.response.send_message(
+        embed=base_embed(L(guild_id, "level_reset_title"), desc, color=Theme.WARNING, guild=interaction.guild),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="giveaway_start", description="เริ่มกิจกรรมแจกของ (จับรางวัลอัตโนมัติ)")
+@app_commands.describe(
+    prize="ของรางวัล",
+    duration="ระยะเวลา เช่น 10m, 2h, 1d12h",
+    winners="จำนวนผู้ชนะ",
+    required_role="ยศที่ต้องมีถึงจะเข้าร่วมได้ (ไม่บังคับ)",
+    channel="ห้องที่จะโพสต์ (เว้นว่าง = ห้องปัจจุบัน)",
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def giveaway_start(
+    interaction: discord.Interaction,
+    prize: str,
+    duration: str,
+    winners: app_commands.Range[int, 1, 50] = 1,
+    required_role: discord.Role = None,
+    channel: discord.TextChannel = None,
+):
+    guild_id = interaction.guild.id
+    seconds = parse_duration(duration)
+    if not seconds:
+        await interaction.response.send_message(
+            embed=base_embed(
+                L(guild_id, "gw_bad_duration_title"),
+                L(guild_id, "gw_bad_duration_desc"),
+                color=Theme.DANGER,
+                guild=interaction.guild,
+            ),
+            ephemeral=True,
+        )
+        return
+
+    target = channel or interaction.channel
+    end_ts = datetime.datetime.now(timezone.utc).timestamp() + seconds
+
+    gw_id = await fq(
+        """
+        INSERT INTO giveaways (guild_id, channel_id, prize, winners, host_id, required_role_id, end_ts)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            str(guild_id), str(target.id), prize, winners,
+            str(interaction.user.id),
+            str(required_role.id) if required_role else None,
+            end_ts,
+        ),
+        fetch="id",
+    )
+
+    gw = {
+        "id": gw_id, "guild_id": str(guild_id), "channel_id": str(target.id),
+        "prize": prize, "winners": winners, "host_id": str(interaction.user.id),
+        "required_role_id": str(required_role.id) if required_role else None,
+        "end_ts": end_ts,
+    }
+    embed = await build_giveaway_embed(interaction.guild, gw, 0)
+    view = GiveawayJoinView(gw_id, 0)
+
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "gw_started_title"),
+            L(guild_id, "gw_started_desc", prize=prize, duration=fmt_duration(seconds)),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+    msg = await target.send(embed=embed, view=view)
+    await fq("UPDATE giveaways SET message_id = ? WHERE id = ?", (str(msg.id), gw_id))
+    bot.add_view(GiveawayJoinView(gw_id, 0))
+
+
+@bot.tree.command(name="giveaway_end", description="จบกิจกรรมแจกของก่อนเวลาและจับรางวัลทันที")
+@app_commands.describe(message_id="ID ของข้อความกิจกรรม")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def giveaway_end(interaction: discord.Interaction, message_id: str):
+    guild_id = interaction.guild.id
+    row = await fq(
+        "SELECT * FROM giveaways WHERE guild_id = ? AND message_id = ?",
+        (str(guild_id), message_id.strip()),
+        fetch="one",
+    )
+    if row is None:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "gw_not_found_title"), L(guild_id, "gw_not_found_desc"),
+                              color=Theme.DANGER, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+    if row["ended"]:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "gw_already_ended_title"), L(guild_id, "gw_already_ended_desc"),
+                              color=Theme.WARNING, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await finish_giveaway(dict(row))
+    await interaction.followup.send(
+        embed=base_embed(L(guild_id, "gw_force_ended_title"), L(guild_id, "gw_force_ended_desc"),
+                          color=Theme.SUCCESS, guild=interaction.guild),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="giveaway_reroll", description="สุ่มผู้ชนะใหม่จากกิจกรรมที่จบไปแล้ว")
+@app_commands.describe(message_id="ID ของข้อความกิจกรรม")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def giveaway_reroll(interaction: discord.Interaction, message_id: str):
+    guild_id = interaction.guild.id
+    row = await fq(
+        "SELECT * FROM giveaways WHERE guild_id = ? AND message_id = ?",
+        (str(guild_id), message_id.strip()),
+        fetch="one",
+    )
+    if row is None:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "gw_not_found_title"), L(guild_id, "gw_not_found_desc"),
+                              color=Theme.DANGER, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await finish_giveaway(dict(row), reroll=True)
+    await interaction.followup.send(
+        embed=base_embed(L(guild_id, "gw_reroll_title"), L(guild_id, "gw_reroll_desc"),
+                          color=Theme.SUCCESS, guild=interaction.guild),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="giveaway_list", description="ดูกิจกรรมแจกของที่ยังเปิดอยู่")
+async def giveaway_list(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    rows = await fq(
+        "SELECT * FROM giveaways WHERE guild_id = ? AND ended = 0 ORDER BY end_ts ASC",
+        (str(guild_id),),
+        fetch="all",
+    ) or []
+
+    if not rows:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "gw_list_title"), L(guild_id, "gw_list_empty"),
+                              color=Theme.WARNING, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    lines = []
+    for row in rows:
+        entries = await count_entries(row["id"])
+        lines.append(f"**• {row['prize']}** — <t:{int(row['end_ts'])}:R> • 👥 {entries} • `{row['message_id']}`")
+
+    await interaction.response.send_message(
+        embed=base_embed(L(guild_id, "gw_list_title"), "\n".join(lines),
+                          color=Theme.PRIMARY, guild=interaction.guild),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="suggestion_setup", description="ตั้งห้องรับไอเดีย/ข้อเสนอแนะ")
+@app_commands.describe(channel="ห้องที่จะให้ไอเดียไปโพสต์")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def suggestion_setup(interaction: discord.Interaction, channel: discord.TextChannel):
+    guild_id = interaction.guild.id
+    await fq(
+        """
+        INSERT INTO suggestion_config (guild_id, channel_id) VALUES (?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET channel_id = ?
+        """,
+        (str(guild_id), str(channel.id), str(channel.id)),
+    )
+    await interaction.response.send_message(
+        embed=base_embed(
+            L(guild_id, "sg_setup_title"),
+            L(guild_id, "sg_setup_desc", channel=channel.mention),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="suggest", description="เสนอไอเดียให้เซิร์ฟเวอร์")
+@app_commands.describe(idea="ไอเดียหรือข้อเสนอแนะของคุณ")
+async def suggest(interaction: discord.Interaction, idea: app_commands.Range[str, 5, 1500]):
+    guild_id = interaction.guild.id
+    conf = await fq("SELECT * FROM suggestion_config WHERE guild_id = ?", (str(guild_id),), fetch="one")
+    if conf is None:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "sg_not_setup_title"), L(guild_id, "sg_not_setup_desc"),
+                              color=Theme.WARNING, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    channel = interaction.guild.get_channel(int(conf["channel_id"]))
+    if not channel:
+        await interaction.response.send_message(
+            embed=base_embed(L(guild_id, "sg_not_setup_title"), L(guild_id, "sg_not_setup_desc"),
+                              color=Theme.DANGER, guild=interaction.guild),
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    sug_id = await fq(
+        """
+        INSERT INTO suggestions (guild_id, channel_id, author_id, content, created_ts)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            str(guild_id), str(channel.id), str(interaction.user.id), idea,
+            datetime.datetime.now(timezone.utc).timestamp(),
+        ),
+        fetch="id",
+    )
+
+    sug = {
+        "id": sug_id, "guild_id": str(guild_id), "channel_id": str(channel.id),
+        "author_id": str(interaction.user.id), "content": idea, "status": "pending",
+        "staff_id": None, "reason": None,
+    }
+    embed = await build_suggestion_embed(interaction.guild, sug, 0, 0)
+    msg = await channel.send(embed=embed, view=SuggestionVoteView(sug_id))
+    await fq("UPDATE suggestions SET message_id = ? WHERE id = ?", (str(msg.id), sug_id))
+    bot.add_view(SuggestionVoteView(sug_id))
+
+    await interaction.followup.send(
+        embed=base_embed(
+            L(guild_id, "sg_sent_title"),
+            L(guild_id, "sg_sent_desc", channel=channel.mention, id=sug_id),
+            color=Theme.SUCCESS,
+            guild=interaction.guild,
+        ),
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(name="suggestion_approve", description="อนุมัติไอเดีย")
+@app_commands.describe(suggestion_id="หมายเลขไอเดีย (#)", reason="เหตุผล (ไม่บังคับ)")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def suggestion_approve(interaction: discord.Interaction, suggestion_id: int, reason: str = None):
+    await review_suggestion(interaction, suggestion_id, "approved", reason)
+
+
+@bot.tree.command(name="suggestion_deny", description="ปฏิเสธไอเดีย")
+@app_commands.describe(suggestion_id="หมายเลขไอเดีย (#)", reason="เหตุผล (ไม่บังคับ)")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def suggestion_deny(interaction: discord.Interaction, suggestion_id: int, reason: str = None):
+    await review_suggestion(interaction, suggestion_id, "denied", reason)
+
+
+_fun_init_db()
+
 
 
 if __name__ == "__main__":
