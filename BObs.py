@@ -65,102 +65,103 @@ class Theme:
 # ---------------------------------------------------------
 # Custom Emoji (Application Emojis)
 # ---------------------------------------------------------
-CUSTOM_EMOJI_NAMES = {
-    "success": "spbluetick",
-    "check": "bluecheckmark",
-    "verified": "verifiedids",
-    "not_verified": "nonverifiedids",
-    "certified": "certified",
-    "info": "info",
-    "lock": "lock",
-    "star": "starids",
-    "star_shiny": "bluestarshiny",
-    "star_outline": "starblue",
-    "thumbsup": "bluethumbsup",
-    "heart": "blueheart",
-    "heart_outline": "bluedrawingheart",
-    "arrow": "darkbluearrow",
-    "staff": "bluestaffbadge",
-    "moderator": "moderator",
-    "blue_moderator": "bluemoderator",
-    "mod_shield": "modshieldicon",
-    "ticket": "ticketicon",
-    "shield": "shield",
-    "link": "link",
-    "web": "webicon",
-    "discord_logo": "discordlogo",
-    "legit": "legit",
-    "warning": "exclamation",
-    "error": "xoflash",
-    "glowing_dot": "glowingdotblue",
-    "planet": "blueplanet",
-    "lines": "lines",
-    "gift": "giftingpatron",
-    "language": "blueplanet",
-    "heart_exclaim": "blueheartexclaim",
-    "illuminati": "illuminaticonfirmed",
-
-    "fun_clap": "pepeclap",
-    "fun_love": "pepeheart",
-    "fun_nervous": "pepenervous",
-    "fun_wow": "pepewow",
-    "fun_perfect": "pepeperfect",
-    "fun_cry": "crying",
-    "fun_tears": "tears",
-    "fun_ohno": "joobiohno",
-    "fun_huh": "joobihuh",
-    "fun_wink": "joobiwink2",
-    "fun_thumbsup": "joobithumbsup",
-    "fun_thumbsdown": "joobithumbsdown",
-    "fun_laughter": "joobilaughter",
-    "fun_rage": "raiva",
-    "fun_ok": "pepeok",
-    "fun_stare": "pepestaring",
-    "fun_banger": "pepebanger",
-    "fun_gamer": "gamer",
-    "fun_crewmate": "bluecrewmate",
-
-    # ----- new Joobi set -----
-    "joobi_stars": "joobistars",
-    "joobi_peeved": "joobipeeved",
-    "joobi_frustrated": "joobifrustrated",
-    "joobi_say_again": "joobisaythatagain",
-    "joobi_think": "joobithink",
-    "joobi_cry": "joobicry3",
-    "joobi_ha": "joobiha",
-    "joobi_point_laugh": "joobipointandlaugh",
-    "joobi_lips": "joobilips",
-    "joobi_smile": "joobismile4",
-    "joobi_thumbup2": "joobithumbup",
-    "joobi_perfect": "joobiperfect",
-    "joobi_bat": "joobibat",
-    "joobi_cat": "joobicat",
-    "joobi_eyebrow": "joobieyebrow2",
-
-    # ----- new Pepe / misc set -----
-    "pepe_oooo": "oooo",
-    "pepe_eu": "eu",
-    "pepe_rich": "peperich",
-    "pepe_komo": "komooo",
-    "pepe_happy": "pepehappy",
-    "pepe_hehe": "hehehe",
-    "pepe_chair": "pepechair",
-    "pepe_uwu": "pepeuwu",
-    "pepe_plain": "pepe",
-    "mlady": "mlady",
-    "crazy_happy": "crazyhappy",
-    "stingray": "stingrayyy",
+CUSTOM_EMOJI_IDS = {
+    # key: (application-emoji name, application-emoji ID จริงจาก Discord)
+    "success": ("spbluetick", "1539646546759516372"),
+    "check": ("bluecheckmark", "1539646542712148028"),
+    "verified": ("verifiedids", "1539646500206813304"),
+    "not_verified": ("nonverifiedids", "1539646498273235076"),
+    "certified": ("certified", "1539646496415158404"),
+    "info": ("info", "1539646524781363442"),
+    "lock": ("lock", "1539646522818302012"),
+    "star": ("starids", "1539646518997286942"),
+    "star_shiny": ("bluestarshiny", "1539646550580404385"),
+    "star_outline": ("starblue", None),
+    "thumbsup": ("bluethumbsup", "1539646517009449050"),
+    "heart": ("blueheart", "1539646514719232130"),
+    "heart_outline": ("bluedrawingheart", "1539646554678362243"),
+    "arrow": ("darkbluearrow", "1539646512970211359"),
+    "staff": ("bluestaffbadge", "1539646509711228968"),
+    "moderator": ("moderator", "1539646506083155998"),
+    "blue_moderator": ("bluemoderator", "1539646530946867281"),
+    "mod_shield": ("modshieldicon", "1539646562882551888"),
+    "ticket": ("ticketicon", "1539646548609212486"),
+    "shield": ("shield", "1539646540753141920"),
+    "link": ("link", "1539646538857316473"),
+    "web": ("webicon", "1539646536924004362"),
+    "discord_logo": ("discordlogo", "1539646534910484500"),
+    "legit": ("legit", "1539646533027500042"),
+    "warning": ("exclamation", "1539646544603652166"),
+    "error": ("xoflash", "1539646526429597747"),
+    "glowing_dot": ("glowingdotblue", "1539646520800976927"),
+    "planet": ("blueplanet", "1539646507958013982"),
+    "lines": ("lines", "1539646528770019468"),
+    "gift": ("giftingpatron", "1539646557173846089"),
+    "language": ("blueplanet", "1539646507958013982"),
+    "heart_exclaim": ("blueheartexclaim", "1539646501784129607"),
+    "illuminati": ("illuminaticonfirmed", "1539646494657880185"),
+    "fun_clap": ("pepeclap", "1539646611351801887"),
+    "fun_love": ("pepeheart", "1539646568913707090"),
+    "fun_nervous": ("pepenervous", "1539646586877911120"),
+    "fun_wow": ("pepewow", "1539646573133303872"),
+    "fun_perfect": ("pepeperfect", "1539646570918715532"),
+    "fun_cry": ("crying", "1539646567055892480"),
+    "fun_tears": ("tears", "1539646565277372446"),
+    "fun_ohno": ("joobiohno", "1539646636060315759"),
+    "fun_huh": ("joobihuh", "1539646621866926100"),
+    "fun_wink": ("joobiwink2", "1539646617232343123"),
+    "fun_thumbsup": ("joobithumbsup", "1539646661742297089"),
+    "fun_thumbsdown": ("joobithumbsdown", "1539646651331772568"),
+    "fun_laughter": ("joobilaughter", "1539646649117188187"),
+    "fun_rage": ("raiva", "1539646609200128013"),
+    "fun_ok": ("pepeok", "1539646613138575440"),
+    "fun_stare": ("pepestaring", "1539646594272460920"),
+    "fun_banger": ("pepebanger", "1539646575893151834"),
+    "fun_gamer": ("gamer", "1539646578086645860"),
+    "fun_crewmate": ("bluecrewmate", "1539646560890003486"),
+    "joobi_stars": ("joobistars", "1539646659938623579"),
+    "joobi_peeved": ("joobipeeved", "1539646657761644604"),
+    "joobi_frustrated": ("joobifrustrated", "1539646655257776258"),
+    "joobi_say_again": ("joobisaythatagain", "1539646653525397634"),
+    "joobi_think": ("joobithink", "1539646646940598282"),
+    "joobi_cry": ("joobicry3", "1539646644910301224"),
+    "joobi_ha": ("joobiha", "1539646642813149334"),
+    "joobi_point_laugh": ("joobipointandlaugh", "1539646640904994958"),
+    "joobi_lips": ("joobilips", "1539646633749258330"),
+    "joobi_smile": ("joobismile4", "1539646631127941141"),
+    "joobi_thumbup2": ("joobithumbup", "1539646628817014874"),
+    "joobi_perfect": ("joobiperfect", "1539646638715576320"),
+    "joobi_bat": ("joobibat", "1539646624102621194"),
+    "joobi_cat": ("joobicat", "1539646619736088696"),
+    "joobi_eyebrow": ("joobieyebrow2", "1539646614925480087"),
+    "pepe_oooo": ("oooo", "1539646606821818430"),
+    "pepe_eu": ("eu", "1539646604271681556"),
+    "pepe_rich": ("peperich", "1539646602204020766"),
+    "pepe_komo": ("komooo", "1539646599691763882"),
+    "pepe_happy": ("pepehappy", "1539646597778907217"),
+    "pepe_hehe": ("hehehe", "1539646596076273736"),
+    "pepe_chair": ("pepechair", "1539646592351739994"),
+    "pepe_uwu": ("pepeuwu", "1539646590334009544"),
+    "pepe_plain": ("pepe", "1539646588706758687"),
+    "mlady": ("mlady", "1539646582536933439"),
+    "crazy_happy": ("crazyhappy", "1539646579898716170"),
+    "stingray": ("stingrayyy", "1539646559065612298"),
 }
 
 custom_emoji_cache: dict[str, "discord.Emoji"] = {}
 
 
 def E(key: str, fallback: str = "❓") -> str:
-    emoji_name = CUSTOM_EMOJI_NAMES.get(key)
-    if emoji_name:
-        emoji = custom_emoji_cache.get(emoji_name)
-        if emoji:
-            return str(emoji)
+    emoji_entry = CUSTOM_EMOJI_IDS.get(key)
+    if emoji_entry:
+        emoji_name, emoji_id = emoji_entry
+        if emoji_id:
+            # ฝัง ID ตรง ๆ — ไม่ต้องพึ่งการ fetch/cache ตอนบอทรัน
+            return f"<:{emoji_name}:{emoji_id}>"
+        # ไม่รู้ ID (ยังไม่มีใครให้เลขมา) — ลองหาใน cache จากชื่อแทน
+        cached = custom_emoji_cache.get(emoji_name)
+        if cached:
+            return str(cached)
     return fallback
 
 
@@ -3228,7 +3229,10 @@ async def emojis_command(interaction: discord.Interaction):
     ]
 
     for title, keys in groups:
-        value = "  ".join(f"{E(key)} `{key}`" for key in keys)
+        value = "  ".join(
+            f"{E(key)} `{key}` ({CUSTOM_EMOJI_IDS[key][1] or 'ยังไม่มี ID'})"
+            for key in keys
+        )
         embed.add_field(name=title, value=value, inline=False)
 
     embed.add_field(
