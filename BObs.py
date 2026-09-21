@@ -148,20 +148,29 @@ CUSTOM_EMOJI_IDS = {
     "stingray": ("stingrayyy", "1539646559065612298"),
 }
 
-custom_emoji_cache: dict[str, "discord.Emoji"] = {}
+custom_emoji_cache: dict[str, "discord.Emoji"] = {}   # key = ชื่ออีโมจิ
+custom_emoji_by_id: dict[int, "discord.Emoji"] = {}   # key = ID อีโมจิ
 
 
 def E(key: str, fallback: str = "❓") -> str:
     emoji_entry = CUSTOM_EMOJI_IDS.get(key)
-    if emoji_entry:
-        emoji_name, emoji_id = emoji_entry
-        if emoji_id:
-            # ฝัง ID ตรง ๆ — ไม่ต้องพึ่งการ fetch/cache ตอนบอทรัน
-            return f"<:{emoji_name}:{emoji_id}>"
-        # ไม่รู้ ID (ยังไม่มีใครให้เลขมา) — ลองหาใน cache จากชื่อแทน
-        cached = custom_emoji_cache.get(emoji_name)
+    if not emoji_entry:
+        return fallback
+
+    emoji_name, emoji_id = emoji_entry
+
+    # ใช้ตัวจริงจาก Discord ก่อน (รู้ว่า animated หรือไม่ -> ได้ <a:..> ถูกต้อง)
+    if emoji_id:
+        cached = custom_emoji_by_id.get(int(emoji_id))
         if cached:
             return str(cached)
+    cached = custom_emoji_cache.get(emoji_name)
+    if cached:
+        return str(cached)
+
+    # cache ยังไม่พร้อม -> ฝัง ID ตรง ๆ (ถือว่าไม่ animated)
+    if emoji_id:
+        return f"<:{emoji_name}:{emoji_id}>"
     return fallback
 
 
@@ -1969,7 +1978,10 @@ async def load_custom_emojis():
     try:
         app_emojis = await bot.fetch_application_emojis()
         custom_emoji_cache.clear()
-        custom_emoji_cache.update({emoji.name: emoji for emoji in app_emojis})
+        custom_emoji_by_id.clear()
+        for emoji in app_emojis:
+            custom_emoji_cache[emoji.name] = emoji
+            custom_emoji_by_id[emoji.id] = emoji
         logger.info(f"Loaded {len(custom_emoji_cache)} custom emoji(s)")
     except discord.HTTPException:
         logger.exception("Failed to load custom emoji (falling back to unicode emoji)")
@@ -2037,7 +2049,10 @@ async def on_message(message: discord.Message):
     if message.author.bot or not message.guild:
         return
 
-    await fun_handle_message_xp(message)
+    try:
+        await fun_handle_message_xp(message)
+    except Exception:
+        logger.exception("XP handler failed")
 
     guild_id = message.guild.id
     conf = ai_config.get(str(guild_id))
@@ -3547,11 +3562,12 @@ async def get_level_row(guild_id, user_id) -> dict:
 
 
 async def get_user_rank(guild_id, user_id) -> int:
+    # COALESCE: คนที่ยังไม่มีแถวใน levels ถือว่ามี total_xp = 0
     row = await fq(
         """
         SELECT COUNT(*) + 1 AS rank FROM levels
-        WHERE guild_id = ? AND total_xp > (
-            SELECT total_xp FROM levels WHERE guild_id = ? AND user_id = ?
+        WHERE guild_id = ? AND total_xp > COALESCE(
+            (SELECT total_xp FROM levels WHERE guild_id = ? AND user_id = ?), 0
         )
         """,
         (str(guild_id), str(guild_id), str(user_id)),
