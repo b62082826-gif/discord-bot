@@ -1,9 +1,9 @@
-// เครดิต : MC  https://discord.gg/3VRwGSZZZE  (เวอร์ชัน JavaScript / discord.js v14)
-// ต้องใช้ Node.js 18+ และ discord.js 14.19+  ->  npm install discord.js
+// เครดิต : MC https://discord.gg/3VRwGSZZZE (เวอร์ชัน JavaScript / discord.js v14)
+// ต้องใช้ Node.js 18+ และ discord.js 14.19+ -> npm install discord.js
 //
-// ตั้งค่าโทเค่นผ่าน environment variable:  DISCORD_TOKEN
-//   Windows (cmd):  set DISCORD_TOKEN=xxxxx && node cat_shop_ticket_bot.js
-//   Linux/Mac:      DISCORD_TOKEN=xxxxx node cat_shop_ticket_bot.js
+// ตั้งค่าโทเค่นผ่าน environment variable: DISCORD_TOKEN
+// Windows (cmd): set DISCORD_TOKEN=xxxxx && node cat_shop_ticket_bot.js
+// Linux/Mac: DISCORD_TOKEN=xxxxx node cat_shop_ticket_bot.js
 
 const fs = require("fs");
 const {
@@ -16,52 +16,175 @@ const {
   Routes,
   InteractionType,
   EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
 } = require("discord.js");
 
 // bot-hosting.net: ใส่โทเค่นใน Environment/Startup variable ชื่อ DISCORD_TOKEN
-// หรือสร้างไฟล์ .env ข้าง ๆ ไฟล์นี้ แล้วเขียนบรรทัด  DISCORD_TOKEN=xxxxx  (ต้องใช้ Node 20.12+)
+// หรือสร้างไฟล์ .env ข้าง ๆ ไฟล์นี้ แล้วเขียนบรรทัด DISCORD_TOKEN=xxxxx (ต้องใช้ Node 20.12+)
 try {
   if (fs.existsSync(".env") && typeof process.loadEnvFile === "function") process.loadEnvFile(".env");
 } catch (e) {
   console.error("[ENV] อ่านไฟล์ .env ไม่ได้:", e.message);
 }
+
 const BOT_TOKEN = process.env.DISCORD_TOKEN || "";
-const OWNER_ID = "1524722784817909811";            // ไอดีเจ้าของที่ใช้คำสั่ง /ตั้งค่าตั๋ว ได้ (ใส่เป็น string)
-const BUG_CATEGORY_ID = "1572197960509292644";     // หมวดหมู่ แจ้งบั๊ก
+const OWNER_ID = "1524722784817909811"; // ไอดีเจ้าของที่ใช้คำสั่ง /ตั้งค่าตั๋ว ได้ (ใส่เป็น string)
+const BUG_CATEGORY_ID = "1572197960509292644"; // หมวดหมู่ แจ้งบั๊ก
 const CONTACT_CATEGORY_ID = "1572198033670545510"; // หมวดหมู่ ติดต่อ
 
 // ───────────────────────── ตั้งค่าระบบเสริม (เว้นว่าง "" = ปิดส่วนนั้น) ─────────────────────────
-const VERIFY_ROLE_ID = "1571827346510446647";          // ยศที่ได้เมื่อกดยืนยันตัวตน (บอทต้องมีสิทธิ์ Manage Roles และยศบอทต้องอยู่สูงกว่ายศนี้)
-const VERIFY_MIN_ACCOUNT_DAYS = 0;  // อายุบัญชี Discord ขั้นต่ำ (วัน) ถึงจะยืนยันได้ 0 = ไม่เช็ก
-const WELCOME_CHANNEL_ID = "1571827347722739815";      // ห้องข้อความต้อนรับสมาชิกใหม่
-const LEAVE_CHANNEL_ID = "1571827347722739817";        // ห้องแจ้งคนออก (เว้นว่าง = ใช้ห้องต้อนรับ)
-const WELCOME_IMAGE_URL = "https://i.pinimg.com/736x/4e/43/47/4e4347489e411396189a611b05645ae2.jpg";       // รูปแบนเนอร์ในข้อความต้อนรับ (ไม่ใส่ก็ได้)
-const LEVEL_UP_CHANNEL_ID = "https://i.pinimg.com/736x/aa/33/0a/aa330a77aa7bb939f807d08d868a3b6d.jpg";     // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
-const LEVEL_ROLES = { 1: "1571827346523037780", 5: "1571827346523037781", 10: "1571827346523037782", 20: "1571827346523037783", 35: "1571827346523037784", 50: "1571827346523037785", 100: "1571827346523037786" }; // ยศตามเลเวลconst XP_MIN = 15;                  // XP ต่อข้อความ (สุ่มระหว่าง MIN-MAX)
+const VERIFY_ROLE_ID = "1571827346510446647"; // ยศที่ได้เมื่อกดยืนยันตัวตน (บอทต้องมีสิทธิ์ Manage Roles และยศบอทต้องอยู่สูงกว่ายศนี้)
+const VERIFY_MIN_ACCOUNT_DAYS = 0; // อายุบัญชี Discord ขั้นต่ำ (วัน) ถึงจะยืนยันได้ 0 = ไม่เช็ก
+const WELCOME_CHANNEL_ID = "1571827347722739815"; // ห้องข้อความต้อนรับสมาชิกใหม่
+const LEAVE_CHANNEL_ID = "1571827347722739817"; // ห้องแจ้งคนออก (เว้นว่าง = ใช้ห้องต้อนรับ)
+const WELCOME_IMAGE_URL = "https://i.pinimg.com/736x/4e/43/47/4e4347489e411396189a611b05645ae2.jpg"; // รูปแบนเนอร์ในข้อความต้อนรับ (ไม่ใส่ก็ได้)
+const LEVEL_UP_CHANNEL_ID = "https://i.pinimg.com/736x/aa/33/0a/aa330a77aa7bb939f807d08d868a3b6d.jpg"; // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
+const LEVEL_ROLES = { 1: "1571827346523037780", 5: "1571827346523037781", 10: "1571827346523037782", 20: "1571827346523037783", 35: "1571827346523037784", 50: "1571827346523037785", 100: "1571827346523037786" }; // ยศตามเลเวล
+const XP_MIN = 15; // XP ต่อข้อความ (สุ่มระหว่าง MIN-MAX)
 const XP_MAX = 100;
-const XP_COOLDOWN_MS = 60_000;      // นับ XP ได้ทุก ๆ กี่มิลลิวินาทีต่อคน
+const XP_COOLDOWN_MS = 60_000; // นับ XP ได้ทุก ๆ กี่มิลลิวินาทีต่อคน
 
 // ลิงก์ cdn.discordapp.com ที่มี ?ex=&is=&hm= จะหมดอายุ -> รูปพัง
 // แนะนำใช้ลิงก์รูปถาวร
 const TICKET_IMAGE_URL =
   "https://i.pinimg.com/736x/1c/54/2b/1c542b646ec39944d70dc01ea3fe3122.jpg";
 
-// ───────────────────────── อีโมจิ (Application Emoji ของบอท) ─────────────────────────
-// รูปแบบ: [ชื่อ, ID]  ดูได้ที่ Developer Portal -> Emojis
-const E_IDS = {
-  ticket:   ["431007ticketicon",     "1572207134970482748"],
-  approve:  ["157030approveids",     "1572207131262853160"],
-  denied:   ["944140deniedids",      "1572207141224190003"],
-  verify:   ["45415verifygreen",     "1572207125323714580"],
-  shield:   ["379975bluestaff",      "1572207133230108703"],
-  partner:  ["18284partner",         "1572207119489572914"],
+// ───────────────────────── ระบบรับยศ 77 จังหวัด ─────────────────────────
+const PROVINCE_IMAGE_URL =
+  "https://cdn.discordapp.com/attachments/1493234210461454477/1496482490104418364/5C4280CF-E1CB-4D15-AE26-A9FF5852A140.gif";
+
+const PROVINCE_REGIONS = {
+  "ภาคเหนือ": [
+    "เชียงใหม่", "เชียงราย", "ลำปาง", "ลำพูน", "แม่ฮ่องสอน",
+    "น่าน", "พะเยา", "แพร่", "อุตรดิตถ์",
+  ],
+  "ภาคอีสาน": [
+    "ขอนแก่น", "อุดรธานี", "นครราชสีมา", "อุบลราชธานี", "ร้อยเอ็ด",
+    "มหาสารคาม", "กาฬสินธุ์", "สกลนคร", "เลย", "ชัยภูมิ",
+    "หนองคาย", "หนองบัวลำภู", "ยโสธร", "ศรีสะเกษ", "สุรินทร์",
+    "บุรีรัมย์", "มุกดาหาร", "อำนาจเจริญ", "นครพนม", "บึงกาฬ",
+  ],
+  "ภาคกลาง": [
+    "กรุงเทพมหานคร", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ",
+    "พระนครศรีอยุธยา", "อ่างทอง", "ลพบุรี", "สิงห์บุรี",
+    "ชัยนาท", "สระบุรี", "นครนายก", "สุพรรณบุรี",
+    "นครปฐม", "สมุทรสาคร", "สมุทรสงคราม",
+    "สุโขทัย", "พิษณุโลก", "พิจิตร", "กำแพงเพชร",
+    "เพชรบูรณ์", "นครสวรรค์", "อุทัยธานี",
+  ],
+  "ภาคตะวันออก": [
+    "ชลบุรี", "ระยอง", "จันทบุรี", "ตราด", "ฉะเชิงเทรา",
+    "ปราจีนบุรี", "สระแก้ว",
+  ],
+  "ภาคตะวันตก": [
+    "ตาก", "กาญจนบุรี", "ราชบุรี", "เพชรบุรี", "ประจวบคีรีขันธ์",
+  ],
+  "ภาคใต้": [
+    "ภูเก็ต", "กระบี่", "พังงา", "ระนอง", "ชุมพร",
+    "สุราษฎร์ธานี", "นครศรีธรรมราช", "พัทลุง", "ตรัง",
+    "สงขลา", "สตูล", "ปัตตานี", "ยะลา", "นราธิวาส",
+  ],
 };
-const em = (k) => `<:${E_IDS[k][0]}:${E_IDS[k][1]}>`;           // ใช้ในข้อความ
-const btnEmoji = (k) => ({ id: E_IDS[k][1], name: E_IDS[k][0] }); // ใช้บนปุ่ม
+const ALL_PROVINCES = new Set(Object.values(PROVINCE_REGIONS).flat()); // 77 จังหวัด
+
+function buildProvincePanelPayload() {
+  const embed = new EmbedBuilder()
+    .setColor(0x3498db)
+    .setTitle("📍 ระบบรับยศ 77 จังหวัด")
+    .setDescription("# ระบบรับยศ 77 จังหวัด\n-# Developed by MC")
+    .setImage(PROVINCE_IMAGE_URL);
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("region_select")
+    .setPlaceholder("เลือกภูมิภาค")
+    .addOptions(Object.keys(PROVINCE_REGIONS).map((r) => ({ label: r, value: r })));
+
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
+}
+
+async function handleRegionSelect(interaction) {
+  const region = interaction.values[0];
+  if (!Object.hasOwn(PROVINCE_REGIONS, region)) {
+    return interaction.reply({ content: "❌ ไม่พบภูมิภาคนี้", flags: MessageFlags.Ephemeral });
+  }
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("province_select")
+    .setPlaceholder("เลือกจังหวัดของคุณ")
+    .addOptions(PROVINCE_REGIONS[region].map((p) => ({ label: p, value: p })));
+
+  return interaction.reply({
+    content: `📍 เลือกจังหวัดใน ${region}`,
+    components: [new ActionRowBuilder().addComponents(menu)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+async function handleProvinceSelect(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const province = interaction.values[0];
+  if (!interaction.guild || !interaction.member || !ALL_PROVINCES.has(province)) {
+    return interaction.editReply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์ และต้องเลือกจังหวัดที่มีในรายการ");
+  }
+
+  const role = interaction.guild.roles.cache.find((r) => r.name === province);
+  if (!role) return interaction.editReply("❌ ไม่พบยศ (ให้แอดมินใช้ /สร้างยศ77 ก่อน)");
+
+  try {
+    // ถอดยศจังหวัดเดิมออก เพื่อให้มีจังหวัดเดียวต่อคน
+    const oldRoles = interaction.member.roles.cache.filter(
+      (r) => ALL_PROVINCES.has(r.name) && r.id !== role.id
+    );
+    if (oldRoles.size) await interaction.member.roles.remove(oldRoles, "เปลี่ยนจังหวัด");
+    await interaction.member.roles.add(role, "รับยศจังหวัด");
+    return interaction.editReply(`✅ คุณได้รับยศ: ${role.name}`);
+  } catch (e) {
+    console.error("[PROVINCE]", e.message);
+    return interaction.editReply("❌ ให้ยศไม่สำเร็จ (บอทอาจไม่มีสิทธิ์ Manage Roles หรือยศบอทต่ำกว่ายศจังหวัด) กรุณาแจ้งแอดมิน");
+  }
+}
+
+async function handleCreateProvinceRoles(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  if (!interaction.guild) return interaction.editReply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์");
+
+  const roles = await interaction.guild.roles.fetch();
+  const existing = new Set(roles.map((r) => r.name));
+  let created = 0;
+
+  try {
+    for (const province of ALL_PROVINCES) {
+      if (existing.has(province)) continue;
+      await interaction.guild.roles.create({ name: province, reason: "สร้างยศ 77 จังหวัด" });
+      created++;
+    }
+  } catch (e) {
+    console.error("[CREATE ROLES]", e.message);
+    const why = e.code === 30005 ? "เซิร์ฟเวอร์มียศครบจำนวนสูงสุดแล้ว (250)" : "บอทอาจไม่มีสิทธิ์ Manage Roles";
+    return interaction.editReply(`⚠️ สร้างได้ ${created} ยศ แล้วหยุด: ${why}`);
+  }
+
+  return interaction.editReply(`✅ สร้างยศสำเร็จ ${created} ยศ`);
+}
 
 const STATE_FILE = "ticket_state.json";
 const LEVEL_FILE = "levels.json";
 const AUTO_REPLY_COOLDOWN_MS = 60_000;
+
+// ───────────────────────── อีโมจิ (Application Emoji ของบอท) ─────────────────────────
+// รูปแบบ: [ชื่อ, ID] ดูได้ที่ Developer Portal -> Emojis
+const E_IDS = {
+  ticket: ["431007ticketicon", "1572207134970482748"],
+  approve: ["157030approveids", "1572207131262853160"],
+  denied: ["944140deniedids", "1572207141224190003"],
+  verify: ["45415verifygreen", "1572207125323714580"],
+  shield: ["379975bluestaff", "1572207133230108703"],
+  partner: ["18284partner", "1572207119489572914"],
+};
+const em = (k) => `<:${E_IDS[k][0]}:${E_IDS[k][1]}>`; // ใช้ในข้อความ
+const btnEmoji = (k) => ({ id: E_IDS[k][1], name: E_IDS[k][0] }); // ใช้บนปุ่ม
 
 // ───────────────────────── state ─────────────────────────
 function loadState() {
@@ -153,11 +276,11 @@ async function awardXp(message) {
   const before = levelFromXp(user.xp).level;
   user.xp += XP_MIN + Math.floor(Math.random() * (XP_MAX - XP_MIN + 1));
   levelsDirty = true;
-
   const after = levelFromXp(user.xp).level;
   if (after <= before) return;
 
   await giveLevelRoles(member, after);
+
   const channel = LEVEL_UP_CHANNEL_ID
     ? await client.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null)
     : message.channel;
@@ -185,7 +308,7 @@ async function handleRank(interaction) {
     .setColor(0x2b2d31)
     .setAuthor({ name: target.username, iconURL: target.displayAvatarURL() })
     .setDescription(
-      `**เลเวล ${level}**\n${bar}  ${current}/${need} XP\n\n` +
+      `**เลเวล ${level}**\n${bar} ${current}/${need} XP\n\n` +
       `อันดับ **${position > 0 ? position : "-"}** จาก ${total} คน · XP รวม ${xp}`
     );
   return interaction.reply({ embeds: [embed] });
@@ -208,7 +331,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // ต้องเปิด Privileged Intent ใน Developer Portal
-    GatewayIntentBits.GuildMembers,   // ต้องเปิด Privileged Intent ใน Developer Portal
+    GatewayIntentBits.GuildMembers, // ต้องเปิด Privileged Intent ใน Developer Portal
   ],
 });
 
@@ -363,6 +486,7 @@ function buildVerifyPanelPayload() {
 
 async function handleVerify(interaction) {
   const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+
   if (!VERIFY_ROLE_ID) return reply("❌ ยังไม่ได้ตั้งค่ายศสำหรับยืนยันตัวตน กรุณาแจ้งแอดมิน");
   if (!interaction.guild || !interaction.member) return reply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์");
   if (interaction.member.roles.cache.has(VERIFY_ROLE_ID)) return reply("✅ คุณยืนยันตัวตนแล้ว");
@@ -373,6 +497,7 @@ async function handleVerify(interaction) {
       return reply(`❌ บัญชี Discord ต้องมีอายุอย่างน้อย ${VERIFY_MIN_ACCOUNT_DAYS} วันจึงจะยืนยันได้`);
     }
   }
+
   try {
     await interaction.member.roles.add(VERIFY_ROLE_ID, "ยืนยันตัวตนผ่านปุ่ม");
     return reply("✅ ยืนยันตัวตนสำเร็จ ยินดีต้อนรับ!");
@@ -460,6 +585,7 @@ async function handleOpenTicket(interaction, categoryId, type) {
   if (!interaction.guild || !interaction.member) {
     return interaction.editReply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์");
   }
+
   const { channel, error } = await createTicketChannel(
     interaction.guild, interaction.member, categoryId, type
   );
@@ -473,6 +599,7 @@ async function handleOpenTicket(interaction, categoryId, type) {
         "• สิ่งที่คาดหวัง และสิ่งที่เกิดขึ้นจริง\n" +
         "• แนบภาพหน้าจอหรือวิดีโอ (ถ้ามี)"
       : "";
+
   await sendRaw(channel.id, buildWelcomePayload(interaction.user.id, extra));
   return interaction.editReply(`✅ เปิดตั๋วแล้ว! → ${channel}`);
 }
@@ -482,6 +609,8 @@ client.once(Events.ClientReady, async (c) => {
   await c.application.commands.set([
     { name: "ตั้งค่าตั๋ว", description: "ส่งแผงระบบตั๋วไปยังช่องนี้" },
     { name: "ตั้งค่ายืนยัน", description: "ส่งแผงยืนยันตัวตนไปยังช่องนี้" },
+    { name: "ตั้งค่าระบบ", description: "สร้างระบบรับยศ 77 จังหวัด" },
+    { name: "สร้างยศ77", description: "สร้าง Role 77 จังหวัด" },
     {
       name: "เลเวล",
       description: "ดูเลเวลและ XP",
@@ -521,6 +650,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const ok = await sendRaw(interaction.channelId, buildVerifyPanelPayload());
           return interaction.editReply(ok ? "✅ ส่งแผงยืนยันตัวตนเรียบร้อยแล้ว" : "❌ ส่งแผงไม่สำเร็จ (ดู log / เช็คสิทธิ์บอทและอีโมจิ)");
         }
+        case "ตั้งค่าระบบ": {
+          if (interaction.user.id !== OWNER_ID) {
+            return interaction.reply({ content: "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้", flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+          const ok = await sendRaw(interaction.channelId, buildProvincePanelPayload());
+          return interaction.editReply(ok ? "✅ ส่งแผงรับยศจังหวัดเรียบร้อยแล้ว" : "❌ ส่งแผงไม่สำเร็จ (ดู log / เช็คสิทธิ์บอท)");
+        }
+        case "สร้างยศ77": {
+          if (interaction.user.id !== OWNER_ID) {
+            return interaction.reply({ content: "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้", flags: MessageFlags.Ephemeral });
+          }
+          return await handleCreateProvinceRoles(interaction);
+        }
         case "เลเวล":
           return await handleRank(interaction);
         case "อันดับ":
@@ -532,6 +675,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.type !== InteractionType.MessageComponent) return;
 
     switch (interaction.customId) {
+      case "region_select":
+        return await handleRegionSelect(interaction);
+      case "province_select":
+        return await handleProvinceSelect(interaction);
       case "verify_member":
         return await handleVerify(interaction);
       case "ticket_bug":
@@ -587,6 +734,7 @@ client.on(Events.MessageCreate, async (message) => {
   } else if (channel.parentId === CONTACT_CATEGORY_ID && isPartnerRelated(message.content)) {
     reply = "ส่งลิ้งและพร้อมอธิบายเซิร์ฟเวอร์ของท่านได้เลย รอแอดมินมาอนุมัตินะคับ";
   }
+
   if (reply) {
     lastAutoReply.set(channel.id, now);
     await message.reply(reply).catch((e) => console.error("[REPLY ERROR]", e.message));
@@ -638,4 +786,4 @@ if (!BOT_TOKEN) {
   console.error("ยังไม่ได้ตั้งค่า DISCORD_TOKEN");
   process.exit(1);
 }
-client.login(BOT_TOKEN);;
+client.login(BOT_TOKEN);
