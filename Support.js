@@ -50,7 +50,7 @@ const TICKET_IMAGE_URL =
 
 // ───────────────────────── ระบบรับยศ 77 จังหวัด ─────────────────────────
 const PROVINCE_IMAGE_URL =
-  "https://cdn.discordapp.com/attachments/1493234210461454477/1496482490104418364/5C4280CF-E1CB-4D15-AE26-A9FF5852A140.gif";
+  "https://i.pinimg.com/1200x/e9/9a/b8/e99ab860faa0f47a5931a5a472afea0c.jpg";
 
 const PROVINCE_REGIONS = {
   "ภาคเหนือ": [
@@ -115,7 +115,7 @@ function buildProvincePanelPayload() {
             ],
           },
           { type: 14, spacing: 1 },
-          { type: 10, content: "-# Developed by MC" },
+          { type: 10, content: "-# Developed by bob" },
         ],
       },
     ],
