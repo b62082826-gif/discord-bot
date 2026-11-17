@@ -34,6 +34,19 @@ const CONTACT_CATEGORY_ID = "1572198033670545510"; // หมวดหมู่ �
 const TICKET_IMAGE_URL =
   "https://i.pinimg.com/736x/1c/54/2b/1c542b646ec39944d70dc01ea3fe3122.jpg";
 
+// ───────────────────────── อีโมจิ (Application Emoji ของบอท) ─────────────────────────
+// รูปแบบ: [ชื่อ, ID]  ดูได้ที่ Developer Portal -> Emojis
+const E_IDS = {
+  ticket:   ["431007ticketicon",     "1572207134970482748"],
+  approve:  ["157030approveids",     "1572207131262853160"],
+  denied:   ["944140deniedids",      "1572207141224190003"],
+  verify:   ["45415verifygreen",     "1572207125323714580"],
+  shield:   ["379975bluestaff",      "1572207133230108703"],
+  partner:  ["18284partner",         "1572207119489572914"],
+};
+const em = (k) => `<:${E_IDS[k][0]}:${E_IDS[k][1]}>`;           // ใช้ในข้อความ
+const btnEmoji = (k) => ({ id: E_IDS[k][1], name: E_IDS[k][0] }); // ใช้บนปุ่ม
+
 const STATE_FILE = "ticket_state.json";
 const AUTO_REPLY_COOLDOWN_MS = 60_000;
 
@@ -128,23 +141,23 @@ function isPartnerRelated(text) {
 // ───────────────────────── payloads ─────────────────────────
 function buildTicketPanelPayload() {
   const content = [
-    "# <:cuteee_684132194347909236:1512881767013683390> ยินดีต้อนรับสู่ระบบตั๋ว Support",
+    `# ${em("ticket")} ยินดีต้อนรับสู่ระบบตั๋ว Support`,
     "",
     "กรุณาแจ้งรายละเอียดที่ต้องการให้ครบถ้วน เพื่อให้ทีมงานสามารถตอบกลับและให้บริการได้รวดเร็วยิ่งขึ้น",
     "",
-    "<a:1058991530632818788:1511136593015210104> **กฎการใช้บริการ**",
+    `${em("shield")} **กฎการใช้บริการ**`,
     ...[
       "กรุณาพูดคุยด้วยถ้อยคำสุภาพ",
       "ห้ามสแปมหรือแท็กทีมงานซ้ำ ๆ",
       "กรุณารอทีมงานตอบกลับตามลำดับคิว",
       "เมื่อได้รับงานแล้ว กรุณาตรวจสอบงานให้เรียบร้อยก่อนปิดตั๋ว",
       "หากมีการแก้ไขเพิ่มเติมหลังส่งงาน อาจมีค่าใช้จ่ายเพิ่มเติมตามความเหมาะสม",
-    ].map((s) => `<a:chech_bw:1511137765335498925> ${s}`),
+    ].map((s) => `${em("approve")} ${s}`),
     "",
-    "<a:green_cycle:1496813384497102949> เวลาทำการ",
+    `${em("verify")} เวลาทำการ`,
     "เปิดให้บริการทุกวัน โดยทีมงานจะพยายามตอบกลับให้เร็วที่สุด",
     "",
-    "<a:leftwing:1511122222587314186> ขอบคุณที่เลือกใช้บริการ Support <a:rightwing:1511122610937659413>",
+    `${em("partner")} ขอบคุณที่เลือกใช้บริการ Support`,
     "หากต้องการสั่งทำบอทหรือสอบถามรายละเอียดเพิ่มเติม สามารถแจ้งข้อมูลไว้ในตั๋วนี้ได้เลย ทีมงานจะเข้ามาดูแลคุณโดยเร็วที่สุด",
   ].join("\n");
 
@@ -163,12 +176,12 @@ function buildTicketPanelPayload() {
             components: [
               {
                 type: 2, style: 4, label: "แจ้งบั๊ก",
-                emoji: { name: "🐞" },
+                emoji: btnEmoji("denied"),
                 custom_id: "ticket_bug",
               },
               {
                 type: 2, style: 2, label: "ติดต่อ",
-                emoji: { id: "1496519201215742072", name: "emoji_39", animated: true },
+                emoji: btnEmoji("partner"),
                 custom_id: "ticket_contact",
               },
             ],
@@ -184,7 +197,7 @@ function buildTicketPanelPayload() {
 function buildWelcomePayload(openerId, extra = "") {
   return {
     content:
-      "# <a:leftwing:1511122222587314186> ยินดีต้อนรับคับ <a:rightwing:1511122610937659413>\n" +
+      `# ${em("ticket")} ยินดีต้อนรับคับ\n` +
       `คนเปิดตั๋ว <@${openerId}> รอแอดมินมาตอบนะงับ` +
       (extra ? `\n\n${extra}` : ""),
     components: [
