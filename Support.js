@@ -16,8 +16,6 @@ const {
   Routes,
   InteractionType,
   EmbedBuilder,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
 } = require("discord.js");
 
 // bot-hosting.net: ใส่โทเค่นใน Environment/Startup variable ชื่อ DISCORD_TOKEN
@@ -88,19 +86,40 @@ const PROVINCE_REGIONS = {
 };
 const ALL_PROVINCES = new Set(Object.values(PROVINCE_REGIONS).flat()); // 77 จังหวัด
 
+// หน้าตาเหมือนแผงยืนยันตัวตน (Components V2: Container + ข้อความ + เส้นคั่น + ตัวเลือก)
 function buildProvincePanelPayload() {
-  const embed = new EmbedBuilder()
-    .setColor(0x3498db)
-    .setTitle("📍 ระบบรับยศ 77 จังหวัด")
-    .setDescription("# ระบบรับยศ 77 จังหวัด\n-# Developed by MC")
-    .setImage(PROVINCE_IMAGE_URL);
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId("region_select")
-    .setPlaceholder("เลือกภูมิภาค")
-    .addOptions(Object.keys(PROVINCE_REGIONS).map((r) => ({ label: r, value: r })));
-
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
+  return {
+    flags: MessageFlags.IsComponentsV2,
+    components: [
+      {
+        type: 17,
+        components: [
+          {
+            type: 10,
+            content:
+              `# ${em("verify")} ระบบรับยศ 77 จังหวัด\n\n` +
+              "เลือกภูมิภาคและจังหวัดของคุณจากเมนูด้านล่าง เพื่อรับยศประจำจังหวัด",
+          },
+          { type: 14, spacing: 2 },
+          { type: 12, items: [{ media: { url: PROVINCE_IMAGE_URL } }] }, // MediaGallery
+          { type: 14, spacing: 2 },
+          {
+            type: 1,
+            components: [
+              {
+                type: 3, // StringSelect
+                custom_id: "region_select",
+                placeholder: "เลือกภูมิภาค",
+                options: Object.keys(PROVINCE_REGIONS).map((r) => ({ label: r, value: r })),
+              },
+            ],
+          },
+          { type: 14, spacing: 1 },
+          { type: 10, content: "-# Developed by MC" },
+        ],
+      },
+    ],
+  };
 }
 
 async function handleRegionSelect(interaction) {
@@ -109,15 +128,28 @@ async function handleRegionSelect(interaction) {
     return interaction.reply({ content: "❌ ไม่พบภูมิภาคนี้", flags: MessageFlags.Ephemeral });
   }
 
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId("province_select")
-    .setPlaceholder("เลือกจังหวัดของคุณ")
-    .addOptions(PROVINCE_REGIONS[region].map((p) => ({ label: p, value: p })));
-
   return interaction.reply({
-    content: `📍 เลือกจังหวัดใน ${region}`,
-    components: [new ActionRowBuilder().addComponents(menu)],
-    flags: MessageFlags.Ephemeral,
+    flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+    components: [
+      {
+        type: 17,
+        components: [
+          { type: 10, content: `# ${em("verify")} เลือกจังหวัด\n\nภูมิภาค: **${region}**` },
+          { type: 14, spacing: 2 },
+          {
+            type: 1,
+            components: [
+              {
+                type: 3,
+                custom_id: "province_select",
+                placeholder: "เลือกจังหวัดของคุณ",
+                options: PROVINCE_REGIONS[region].map((p) => ({ label: p, value: p })),
+              },
+            ],
+          },
+        ],
+      },
+    ],
   });
 }
 
