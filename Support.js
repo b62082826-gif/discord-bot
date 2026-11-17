@@ -15,6 +15,7 @@ const {
   MessageFlags,
   Routes,
   InteractionType,
+  EmbedBuilder,
 } = require("discord.js");
 
 // bot-hosting.net: ใส่โทเค่นใน Environment/Startup variable ชื่อ DISCORD_TOKEN
@@ -28,6 +29,18 @@ const BOT_TOKEN = process.env.DISCORD_TOKEN || "";
 const OWNER_ID = "1524722784817909811";            // ไอดีเจ้าของที่ใช้คำสั่ง /ตั้งค่าตั๋ว ได้ (ใส่เป็น string)
 const BUG_CATEGORY_ID = "1572197960509292644";     // หมวดหมู่ แจ้งบั๊ก
 const CONTACT_CATEGORY_ID = "1572198033670545510"; // หมวดหมู่ ติดต่อ
+
+// ───────────────────────── ตั้งค่าระบบเสริม (เว้นว่าง "" = ปิดส่วนนั้น) ─────────────────────────
+const VERIFY_ROLE_ID = "1571827346510446647";          // ยศที่ได้เมื่อกดยืนยันตัวตน (บอทต้องมีสิทธิ์ Manage Roles และยศบอทต้องอยู่สูงกว่ายศนี้)
+const VERIFY_MIN_ACCOUNT_DAYS = 0;  // อายุบัญชี Discord ขั้นต่ำ (วัน) ถึงจะยืนยันได้ 0 = ไม่เช็ก
+const WELCOME_CHANNEL_ID = "1571827347722739815";      // ห้องข้อความต้อนรับสมาชิกใหม่
+const LEAVE_CHANNEL_ID = "1571827347722739817";        // ห้องแจ้งคนออก (เว้นว่าง = ใช้ห้องต้อนรับ)
+const WELCOME_IMAGE_URL = "https://i.pinimg.com/736x/4e/43/47/4e4347489e411396189a611b05645ae2.jpg";       // รูปแบนเนอร์ในข้อความต้อนรับ (ไม่ใส่ก็ได้)
+const LEVEL_UP_CHANNEL_ID = "https://i.pinimg.com/736x/aa/33/0a/aa330a77aa7bb939f807d08d868a3b6d.jpg";     // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
+const LEVEL_ROLES = {{ 1: "1571827346523037780", 5: "1571827346523037781", 10: "1571827346523037782" , 20: "1571827346523037783" , 35: "1571827346523037784" , 50: "1571827346523037785" , 100: "1571827346523037786"}};             // ยศตามเลเวล เช่น { 5: "ไอดียศ", 10: "ไอดียศ", 20: "ไอดียศ" }
+const XP_MIN = 15;                  // XP ต่อข้อความ (สุ่มระหว่าง MIN-MAX)
+const XP_MAX = 100;
+const XP_COOLDOWN_MS = 60_000;      // นับ XP ได้ทุก ๆ กี่มิลลิวินาทีต่อคน
 
 // ลิงก์ cdn.discordapp.com ที่มี ?ex=&is=&hm= จะหมดอายุ -> รูปพัง
 // แนะนำใช้ลิงก์รูปถาวร
@@ -48,6 +61,7 @@ const em = (k) => `<:${E_IDS[k][0]}:${E_IDS[k][1]}>`;           // ใช้ใ�
 const btnEmoji = (k) => ({ id: E_IDS[k][1], name: E_IDS[k][0] }); // ใช้บนปุ่ม
 
 const STATE_FILE = "ticket_state.json";
+const LEVEL_FILE = "levels.json";
 const AUTO_REPLY_COOLDOWN_MS = 60_000;
 
 // ───────────────────────── state ─────────────────────────
@@ -74,6 +88,119 @@ function saveState() {
     JSON.stringify({ bug: state.bug, contact: state.contact, disabled: [...disabledChannels] })
   );
   fs.renameSync(tmp, STATE_FILE); // เขียนแบบ atomic กันไฟล์พัง
+}
+
+// ───────────────────────── level / XP ─────────────────────────
+function loadLevels() {
+  try {
+    if (fs.existsSync(LEVEL_FILE)) return JSON.parse(fs.readFileSync(LEVEL_FILE, "utf-8"));
+  } catch (e) {
+    console.error("[LEVEL] อ่านไฟล์ไม่ได้ ใช้ค่าเริ่มต้น:", e.message);
+  }
+  return {};
+}
+
+const levels = loadLevels(); // { guildId: { userId: { xp } } }
+let levelsDirty = false;
+const lastXp = new Map();
+
+function saveLevels() {
+  if (!levelsDirty) return;
+  levelsDirty = false;
+  try {
+    const tmp = LEVEL_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(levels));
+    fs.renameSync(tmp, LEVEL_FILE);
+  } catch (e) {
+    levelsDirty = true;
+    console.error("[LEVEL] บันทึกไม่สำเร็จ:", e.message);
+  }
+}
+setInterval(saveLevels, 30_000);
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, () => { saveLevels(); process.exit(0); });
+}
+
+// XP ที่ต้องใช้เพื่อขึ้นจากเลเวล lvl ไปเลเวลถัดไป
+const xpNeeded = (lvl) => 5 * lvl * lvl + 50 * lvl + 100;
+
+function levelFromXp(total) {
+  let level = 0, rest = total;
+  while (rest >= xpNeeded(level)) { rest -= xpNeeded(level); level++; }
+  return { level, current: rest, need: xpNeeded(level) };
+}
+
+async function giveLevelRoles(member, level) {
+  for (const [lvl, roleId] of Object.entries(LEVEL_ROLES)) {
+    if (!roleId || level < Number(lvl) || member.roles.cache.has(roleId)) continue;
+    await member.roles.add(roleId, `ถึงเลเวล ${lvl}`)
+      .catch((e) => console.error("[LEVEL ROLE]", e.message));
+  }
+}
+
+async function awardXp(message) {
+  const member = message.member;
+  if (!member) return;
+  const parent = message.channel.parentId;
+  if (parent && (parent === BUG_CATEGORY_ID || parent === CONTACT_CATEGORY_ID)) return; // ไม่นับในห้องตั๋ว
+
+  const key = `${message.guildId}:${message.author.id}`;
+  const now = Date.now();
+  if (now - (lastXp.get(key) ?? 0) < XP_COOLDOWN_MS) return;
+  lastXp.set(key, now);
+
+  const users = (levels[message.guildId] ??= {});
+  const user = (users[message.author.id] ??= { xp: 0 });
+  const before = levelFromXp(user.xp).level;
+  user.xp += XP_MIN + Math.floor(Math.random() * (XP_MAX - XP_MIN + 1));
+  levelsDirty = true;
+
+  const after = levelFromXp(user.xp).level;
+  if (after <= before) return;
+
+  await giveLevelRoles(member, after);
+  const channel = LEVEL_UP_CHANNEL_ID
+    ? await client.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null)
+    : message.channel;
+  if (channel?.isTextBased()) {
+    await channel
+      .send({ content: `${em("approve")} ${member} เลเวลอัปเป็น **เลเวล ${after}** แล้ว!`, allowedMentions: { users: [member.id] } })
+      .catch((e) => console.error("[LEVEL UP]", e.message));
+  }
+}
+
+function rankOf(guildId, userId) {
+  const sorted = Object.entries(levels[guildId] ?? {}).sort((a, b) => b[1].xp - a[1].xp);
+  const i = sorted.findIndex(([id]) => id === userId);
+  return { position: i + 1, total: sorted.length, sorted };
+}
+
+async function handleRank(interaction) {
+  const target = interaction.options.getUser("ผู้ใช้") ?? interaction.user;
+  const xp = levels[interaction.guildId]?.[target.id]?.xp ?? 0;
+  const { level, current, need } = levelFromXp(xp);
+  const { position, total } = rankOf(interaction.guildId, target.id);
+  const filled = Math.round((current / need) * 10);
+  const bar = "▰".repeat(filled) + "▱".repeat(10 - filled);
+  const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setAuthor({ name: target.username, iconURL: target.displayAvatarURL() })
+    .setDescription(
+      `**เลเวล ${level}**\n${bar}  ${current}/${need} XP\n\n` +
+      `อันดับ **${position > 0 ? position : "-"}** จาก ${total} คน · XP รวม ${xp}`
+    );
+  return interaction.reply({ embeds: [embed] });
+}
+
+async function handleLeaderboard(interaction) {
+  const { sorted } = rankOf(interaction.guildId, "");
+  if (!sorted.length) return interaction.reply({ content: "ยังไม่มีข้อมูลเลเวล", flags: MessageFlags.Ephemeral });
+  const medals = ["🥇", "🥈", "🥉"];
+  const lines = sorted.slice(0, 10).map(([id, u], i) =>
+    `${medals[i] ?? `**${i + 1}.**`} <@${id}> — เลเวล ${levelFromXp(u.xp).level} · ${u.xp} XP`
+  );
+  const embed = new EmbedBuilder().setColor(0x2b2d31).setTitle("อันดับเลเวล").setDescription(lines.join("\n"));
+  return interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
 }
 
 // ───────────────────────── client ─────────────────────────
@@ -209,6 +336,53 @@ function buildWelcomePayload(openerId, extra = "") {
   };
 }
 
+function buildVerifyPanelPayload() {
+  return {
+    flags: MessageFlags.IsComponentsV2,
+    components: [
+      {
+        type: 17,
+        components: [
+          {
+            type: 10,
+            content:
+              `# ${em("verify")} ยืนยันตัวตน\n\n` +
+              "กดปุ่มด้านล่างเพื่อรับยศสมาชิก และเข้าถึงห้องต่าง ๆ ภายในเซิร์ฟเวอร์",
+          },
+          { type: 14, spacing: 2 },
+          {
+            type: 1,
+            components: [
+              { type: 2, style: 3, label: "ยืนยันตัวตน", emoji: btnEmoji("verify"), custom_id: "verify_member" },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function handleVerify(interaction) {
+  const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  if (!VERIFY_ROLE_ID) return reply("❌ ยังไม่ได้ตั้งค่ายศสำหรับยืนยันตัวตน กรุณาแจ้งแอดมิน");
+  if (!interaction.guild || !interaction.member) return reply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์");
+  if (interaction.member.roles.cache.has(VERIFY_ROLE_ID)) return reply("✅ คุณยืนยันตัวตนแล้ว");
+
+  if (VERIFY_MIN_ACCOUNT_DAYS > 0) {
+    const ageDays = (Date.now() - interaction.user.createdTimestamp) / 86_400_000;
+    if (ageDays < VERIFY_MIN_ACCOUNT_DAYS) {
+      return reply(`❌ บัญชี Discord ต้องมีอายุอย่างน้อย ${VERIFY_MIN_ACCOUNT_DAYS} วันจึงจะยืนยันได้`);
+    }
+  }
+  try {
+    await interaction.member.roles.add(VERIFY_ROLE_ID, "ยืนยันตัวตนผ่านปุ่ม");
+    return reply("✅ ยืนยันตัวตนสำเร็จ ยินดีต้อนรับ!");
+  } catch (e) {
+    console.error("[VERIFY]", e.message);
+    return reply("❌ ให้ยศไม่สำเร็จ (บอทอาจไม่มีสิทธิ์ หรือยศบอทต่ำกว่ายศยืนยัน) กรุณาแจ้งแอดมิน");
+  }
+}
+
 // ───────────────────────── ticket ─────────────────────────
 function isStaff(member) {
   return (
@@ -308,6 +482,13 @@ async function handleOpenTicket(interaction, categoryId, type) {
 client.once(Events.ClientReady, async (c) => {
   await c.application.commands.set([
     { name: "ตั้งค่าตั๋ว", description: "ส่งแผงระบบตั๋วไปยังช่องนี้" },
+    { name: "ตั้งค่ายืนยัน", description: "ส่งแผงยืนยันตัวตนไปยังช่องนี้" },
+    {
+      name: "เลเวล",
+      description: "ดูเลเวลและ XP",
+      options: [{ type: 6, name: "ผู้ใช้", description: "ดูของคนอื่น (ไม่ใส่ = ของตัวเอง)", required: false }],
+    },
+    { name: "อันดับ", description: "ดูอันดับเลเวล 10 อันดับแรก" },
   ]);
   console.log(`✅ บอทออนไลน์แล้ว: ${c.user.tag} (ID: ${c.user.id})`);
 });
@@ -331,9 +512,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
       );
     }
 
+    if (interaction.isChatInputCommand()) {
+      switch (interaction.commandName) {
+        case "ตั้งค่ายืนยัน": {
+          if (interaction.user.id !== OWNER_ID) {
+            return interaction.reply({ content: "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้", flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+          const ok = await sendRaw(interaction.channelId, buildVerifyPanelPayload());
+          return interaction.editReply(ok ? "✅ ส่งแผงยืนยันตัวตนเรียบร้อยแล้ว" : "❌ ส่งแผงไม่สำเร็จ (ดู log / เช็คสิทธิ์บอทและอีโมจิ)");
+        }
+        case "เลเวล":
+          return await handleRank(interaction);
+        case "อันดับ":
+          return await handleLeaderboard(interaction);
+      }
+      return;
+    }
+
     if (interaction.type !== InteractionType.MessageComponent) return;
 
     switch (interaction.customId) {
+      case "verify_member":
+        return await handleVerify(interaction);
       case "ticket_bug":
         return await handleOpenTicket(interaction, BUG_CATEGORY_ID, "bug");
       case "ticket_contact":
@@ -360,6 +561,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
+
+  await awardXp(message).catch((e) => console.error("[XP ERROR]", e.message));
 
   if (message.content.trim() === "!ปิดระบบ") {
     if (!isStaff(message.member)) return message.reply("❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้");
@@ -391,8 +594,49 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
+// ───────────────────────── ต้อนรับ / ลาออก ─────────────────────────
+async function sendToChannel(channelId, payload) {
+  if (!channelId) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased()) return;
+  await channel.send(payload).catch((e) => console.error("[WELCOME]", e.message));
+}
+
+client.on(Events.GuildMemberAdd, async (member) => {
+  if (member.user.bot) return;
+  // หมายเหตุ: ไม่ใส่อีโมจิในหัวข้อ embed เพราะ Discord ไม่แสดงอีโมจิกำหนดเองในหัวข้อ
+  const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setTitle(`ยินดีต้อนรับสู่ ${member.guild.name}`)
+    .setDescription(
+      `${em("verify")} สวัสดี ${member} ยินดีที่ได้รู้จัก!\n` +
+      `คุณเป็นสมาชิกคนที่ **${member.guild.memberCount}**` +
+      (VERIFY_ROLE_ID ? "\n\nอย่าลืมกดปุ่มยืนยันตัวตนเพื่อเข้าถึงห้องต่าง ๆ" : "")
+    )
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setTimestamp();
+  if (WELCOME_IMAGE_URL) embed.setImage(WELCOME_IMAGE_URL);
+  await sendToChannel(WELCOME_CHANNEL_ID, {
+    content: `${member}`,
+    embeds: [embed],
+    allowedMentions: { users: [member.id] },
+  });
+});
+
+client.on(Events.GuildMemberRemove, async (member) => {
+  if (member.user?.bot) return;
+  const embed = new EmbedBuilder()
+    .setColor(0x2b2d31)
+    .setDescription(
+      `${em("denied")} **${member.user?.username ?? "สมาชิก"}** ออกจากเซิร์ฟเวอร์แล้ว\n` +
+      `ตอนนี้มีสมาชิก **${member.guild.memberCount}** คน`
+    )
+    .setTimestamp();
+  await sendToChannel(LEAVE_CHANNEL_ID || WELCOME_CHANNEL_ID, { embeds: [embed] });
+});
+
 if (!BOT_TOKEN) {
   console.error("ยังไม่ได้ตั้งค่า DISCORD_TOKEN");
   process.exit(1);
 }
-client.login(BOT_TOKEN);
+client.login(BOT_TOKEN);;
