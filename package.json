@@ -2,8 +2,8 @@
   "name": "cat-shop-ticket-bot",
   "version": "1.0.0",
   "description": "Discord ticket bot (discord.js v14)",
-  "main": "cat_shop_ticket_bot.js",
-  "scripts": { "start": "node cat_shop_ticket_bot.js" },
+  "main": "Support.js",
+  "scripts": { "start": "node Support.js" },
   "engines": { "node": ">=22.12" },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
