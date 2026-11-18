@@ -16,7 +16,15 @@ const {
   Routes,
   InteractionType,
   EmbedBuilder,
+  ActivityType,
 } = require("discord.js");
+// ระบบเข้าห้องเสียง: npm install @discordjs/voice libsodium-wrappers (ต้องใช้ Node 22.12+)
+const {
+  joinVoiceChannel,
+  getVoiceConnection,
+  entersState,
+  VoiceConnectionStatus,
+} = require("@discordjs/voice");
 
 // bot-hosting.net: ใส่โทเค่นใน Environment/Startup variable ชื่อ DISCORD_TOKEN
 // หรือสร้างไฟล์ .env ข้าง ๆ ไฟล์นี้ แล้วเขียนบรรทัด DISCORD_TOKEN=xxxxx (ต้องใช้ Node 20.12+)
@@ -37,8 +45,17 @@ const VERIFY_MIN_ACCOUNT_DAYS = 0; // อายุบัญชี Discord ขั
 const WELCOME_CHANNEL_ID = "1571827347722739815"; // ห้องข้อความต้อนรับสมาชิกใหม่
 const LEAVE_CHANNEL_ID = "1571827347722739817"; // ห้องแจ้งคนออก (เว้นว่าง = ใช้ห้องต้อนรับ)
 const WELCOME_IMAGE_URL = "https://i.pinimg.com/736x/4e/43/47/4e4347489e411396189a611b05645ae2.jpg"; // รูปแบนเนอร์ในข้อความต้อนรับ (ไม่ใส่ก็ได้)
-const LEVEL_UP_CHANNEL_ID = "1572553862412369980"; // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
+const LEVEL_UP_CHANNEL_ID = ""; // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
 const LEVEL_ROLES = { 1: "1571827346523037780", 5: "1571827346523037781", 10: "1571827346523037782", 20: "1571827346523037783", 35: "1571827346523037784", 50: "1571827346523037785", 100: "1571827346523037786" }; // ยศตามเลเวล
+// ───────────────────────── ระบบบอทเข้าห้องเสียง ─────────────────────────
+const STATUS_NAME = "https://discord.gg/tV6xz4Rc4n"; // ข้อความสถานะแบบกำลังสตรีม (เว้นว่าง "" = ไม่ตั้งสถานะ)
+const STATUS_URL = "https://www.youtube.com/@HIHi-s2j4q"; // ลิงก์ youtube.com หรือ twitch.tv ถ้าสถานะไม่ขึ้นให้ใช้ลิงก์วิดีโอ/ไลฟ์
+const VOICE_GUILD_ID = "1571827346477154315"; // เซิร์ฟเวอร์ที่ให้บอทเข้าห้องเสียงเองตอนเปิด (เว้นว่าง "" = ไม่ใช้)
+const VOICE_CHANNEL_ID = "1571827351212523623"; // ห้องเสียงที่ให้บอทเข้า (เว้นว่าง "" = ไม่ใช้)
+const VOICE_SELF_MUTE = false;
+const VOICE_SELF_DEAF = true;
+const VOICE_REJOIN_DELAY_MS = 5_000; // รอก่อนเข้าห้องใหม่เมื่อหลุด
+const VOICE_FILE = "voice_channels.json"; // เก็บห้องเสียงของแต่ละเซิร์ฟเวอร์ (ใช้คำสั่ง /เข้าห้อง ได้ทุกเซิร์ฟเวอร์)
 const XP_MIN = 15; // XP ต่อข้อความ (สุ่มระหว่าง MIN-MAX)
 const XP_MAX = 100;
 const XP_COOLDOWN_MS = 60_000; // นับ XP ได้ทุก ๆ กี่มิลลิวินาทีต่อคน
@@ -364,6 +381,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // ต้องเปิด Privileged Intent ใน Developer Portal
     GatewayIntentBits.GuildMembers, // ต้องเปิด Privileged Intent ใน Developer Portal
+    GatewayIntentBits.GuildVoiceStates, // ใช้กับระบบเข้าห้องเสียง (ไม่ใช่ Privileged)
   ],
 });
 
@@ -379,6 +397,136 @@ async function sendRaw(channelId, body) {
     console.error("[API ERROR]", e.status, e.message);
     return false;
   }
+}
+
+// ───────────────────────── ระบบเข้าห้องเสียง ─────────────────────────
+function loadVoiceWanted() {
+  try {
+    if (fs.existsSync(VOICE_FILE)) return JSON.parse(fs.readFileSync(VOICE_FILE, "utf-8"));
+  } catch (e) {
+    console.error("[VOICE] อ่านไฟล์ไม่ได้ ใช้ค่าเริ่มต้น:", e.message);
+  }
+  return {};
+}
+
+const voiceWanted = loadVoiceWanted(); // { guildId: channelId } ห้องที่บอทต้องอยู่
+const voiceTimers = new Map();
+
+function saveVoiceWanted() {
+  try {
+    const tmp = VOICE_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(voiceWanted));
+    fs.renameSync(tmp, VOICE_FILE);
+  } catch (e) {
+    console.error("[VOICE] บันทึกไม่สำเร็จ:", e.message);
+  }
+}
+
+function joinVoice(channel) {
+  getVoiceConnection(channel.guild.id)?.destroy();
+
+  const connection = joinVoiceChannel({
+    channelId: channel.id,
+    guildId: channel.guild.id,
+    adapterCreator: channel.guild.voiceAdapterCreator,
+    selfMute: VOICE_SELF_MUTE,
+    selfDeaf: VOICE_SELF_DEAF,
+  });
+
+  // log สถานะ: Signalling -> Connecting -> Ready คือปกติ
+  connection.on("stateChange", (o, n) => console.log(`[VOICE] ${channel.guild.name}: ${o.status} -> ${n.status}`));
+  connection.on("error", (e) => console.error("[VOICE ERROR]", e.message));
+  entersState(connection, VoiceConnectionStatus.Ready, 30_000).catch(() =>
+    console.error(`[VOICE] เชื่อมต่อห้อง ${channel.name} ไม่สำเร็จใน 30 วินาที (เช็ก Node 22.12+, @discordjs/voice 0.19+, สิทธิ์ Connect)`)
+  );
+
+  connection.on(VoiceConnectionStatus.Disconnected, async () => {
+    try {
+      await Promise.race([
+        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+      ]);
+    } catch {
+      if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
+      scheduleVoiceRejoin(channel.guild.id);
+    }
+  });
+  return connection;
+}
+
+function scheduleVoiceRejoin(guildId) {
+  if (!voiceWanted[guildId] || voiceTimers.has(guildId)) return;
+  const t = setTimeout(async () => {
+    voiceTimers.delete(guildId);
+    await ensureVoiceJoined(guildId);
+  }, VOICE_REJOIN_DELAY_MS);
+  voiceTimers.set(guildId, t);
+}
+
+async function ensureVoiceJoined(guildId) {
+  const channelId = voiceWanted[guildId];
+  if (!channelId) return false;
+  try {
+    const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
+    const channel = await guild.channels.fetch(channelId);
+    if (!channel?.isVoiceBased()) throw new Error("ไม่ใช่ห้องเสียง");
+    joinVoice(channel);
+    console.log(`🔊 เข้าห้อง ${channel.name} ใน ${guild.name}`);
+    return true;
+  } catch (e) {
+    console.error(`[VOICE] เข้าห้องไม่สำเร็จ (guild ${guildId}):`, e.message);
+    scheduleVoiceRejoin(guildId);
+    return false;
+  }
+}
+
+function startVoiceSystem(c) {
+  if (STATUS_NAME) {
+    const activity = STATUS_URL
+      ? { name: STATUS_NAME, type: ActivityType.Streaming, url: STATUS_URL }
+      : { name: STATUS_NAME, type: ActivityType.Playing };
+    c.user.setPresence({ activities: [activity], status: "online" });
+  }
+  if (VOICE_GUILD_ID && VOICE_CHANNEL_ID && !voiceWanted[VOICE_GUILD_ID]) {
+    voiceWanted[VOICE_GUILD_ID] = VOICE_CHANNEL_ID;
+    saveVoiceWanted();
+  }
+  for (const guildId of Object.keys(voiceWanted)) ensureVoiceJoined(guildId);
+}
+
+async function handleVoiceJoin(interaction) {
+  const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  if (!interaction.guild) return reply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์");
+  if (!isStaff(interaction.member) && interaction.user.id !== OWNER_ID) {
+    return reply("❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้");
+  }
+  const channel = interaction.options.getChannel("ห้อง") ?? interaction.member?.voice?.channel;
+  if (!channel?.isVoiceBased()) return reply("❌ เข้าห้องเสียงก่อน หรือเลือกห้องในคำสั่ง");
+
+  const perms = channel.permissionsFor(interaction.guild.members.me);
+  if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms.has(PermissionFlagsBits.Connect)) {
+    return reply("❌ บอทไม่มีสิทธิ์ดู/เชื่อมต่อห้องนั้น (ต้องมี View Channel และ Connect)");
+  }
+  voiceWanted[interaction.guildId] = channel.id;
+  saveVoiceWanted();
+  clearTimeout(voiceTimers.get(interaction.guildId));
+  voiceTimers.delete(interaction.guildId);
+  joinVoice(channel);
+  return reply(`✅ เข้าห้อง ${channel} แล้ว (บอทจะอยู่ค้างและเข้าเองหลังรีสตาร์ท)`);
+}
+
+async function handleVoiceLeave(interaction) {
+  const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  if (!interaction.guild) return reply("❌ ใช้ได้เฉพาะในเซิร์ฟเวอร์");
+  if (!isStaff(interaction.member) && interaction.user.id !== OWNER_ID) {
+    return reply("❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้");
+  }
+  delete voiceWanted[interaction.guildId];
+  saveVoiceWanted();
+  clearTimeout(voiceTimers.get(interaction.guildId));
+  voiceTimers.delete(interaction.guildId);
+  getVoiceConnection(interaction.guildId)?.destroy();
+  return reply("👋 ออกจากห้องเสียงแล้ว");
 }
 
 // ───────────────────────── keyword ─────────────────────────
@@ -642,6 +790,7 @@ async function handleOpenTicket(interaction, categoryId, type) {
 
 // ───────────────────────── events ─────────────────────────
 client.once(Events.ClientReady, async (c) => {
+  startVoiceSystem(c); // ตั้งสถานะ + เข้าห้องเสียง (ทำก่อน ไม่ขึ้นกับการลงทะเบียนคำสั่ง)
   await c.application.commands.set([
     { name: "ตั้งค่าตั๋ว", description: "ส่งแผงระบบตั๋วไปยังช่องนี้" },
     { name: "ตั้งค่ายืนยัน", description: "ส่งแผงยืนยันตัวตนไปยังช่องนี้" },
@@ -654,6 +803,21 @@ client.once(Events.ClientReady, async (c) => {
     },
     { name: "อันดับ", description: "ดูอันดับเลเวล 10 อันดับแรก" },
     SAFE_ROLE_COMMAND,
+    {
+      name: "เข้าห้อง",
+      description: "ให้บอทเข้าห้องเสียงค้างไว้ (ไม่ระบุห้อง = ห้องที่คุณอยู่)",
+      dm_permission: false,
+      options: [
+        {
+          type: 7,
+          name: "ห้อง",
+          description: "ห้องเสียงที่ต้องการให้บอทเข้า",
+          required: false,
+          channel_types: [ChannelType.GuildVoice, ChannelType.GuildStageVoice],
+        },
+      ],
+    },
+    { name: "ออกห้อง", description: "ให้บอทออกจากห้องเสียงและเลิกเข้าห้องอัตโนมัติ", dm_permission: false },
   ]);
   console.log(`✅ บอทออนไลน์แล้ว: ${c.user.tag} (ID: ${c.user.id})`);
 });
@@ -705,6 +869,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return await handleRank(interaction);
         case "อันดับ":
           return await handleLeaderboard(interaction);
+        case "เข้าห้อง":
+          return await handleVoiceJoin(interaction);
+        case "ออกห้อง":
+          return await handleVoiceLeave(interaction);
       }
       return;
     }
@@ -818,6 +986,31 @@ client.on(Events.GuildMemberRemove, async (member) => {
     .setTimestamp();
   await sendToChannel(LEAVE_CHANNEL_ID || WELCOME_CHANNEL_ID, { embeds: [embed] });
 });
+
+// บอทถูกลากย้าย/เตะออกจากห้องเสียง -> เข้าห้องที่ตั้งไว้ใหม่ / log เมื่อมีคนเริ่มสตรีม
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+  if (newState.id === client.user?.id) {
+    const target = voiceWanted[newState.guild.id];
+    if (target && newState.channelId !== target) scheduleVoiceRejoin(newState.guild.id);
+    return;
+  }
+  if (newState.channel && newState.streaming && !oldState.streaming) {
+    console.log(`${newState.member?.user.username ?? newState.id} is in ${newState.channel.name} and started streaming.`);
+  }
+});
+
+process.on("unhandledRejection", (e) => console.error("[UNHANDLED]", e));
+
+// เช็กเวอร์ชันที่ระบบเสียงต้องใช้ (Discord บังคับเข้ารหัสเสียง DAVE)
+{
+  const [maj, min] = process.versions.node.split(".").map(Number);
+  if (maj < 22 || (maj === 22 && min < 12)) {
+    console.error(`⚠️ Node ${process.versions.node} เก่าเกินไปสำหรับเสียง ต้องใช้ Node 22.12 ขึ้นไป (ตั้งใน Startup ของโฮสต์)`);
+  }
+  try { require("@snazzah/davey"); } catch {
+    console.error("⚠️ ขาดแพ็กเกจเสียง รัน: npm install @discordjs/voice@latest @snazzah/davey libsodium-wrappers");
+  }
+}
 
 if (!BOT_TOKEN) {
   console.error("ยังไม่ได้ตั้งค่า DISCORD_TOKEN");
