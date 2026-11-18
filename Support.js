@@ -1,9 +1,9 @@
 // เครดิต : MC https://discord.gg/3VRwGSZZZE (เวอร์ชัน JavaScript / discord.js v14)
-// ต้องใช้ Node.js 18+ และ discord.js 14.19+ -> npm install discord.js
+// ต้องใช้ Node.js 22.12+ และ discord.js 14.19+ -> npm install
 //
 // ตั้งค่าโทเค่นผ่าน environment variable: DISCORD_TOKEN
-// Windows (cmd): set DISCORD_TOKEN=xxxxx && node cat_shop_ticket_bot.js
-// Linux/Mac: DISCORD_TOKEN=xxxxx node cat_shop_ticket_bot.js
+// Windows (cmd): set DISCORD_TOKEN=xxxxx && node Support.js
+// Linux/Mac: DISCORD_TOKEN=xxxxx node Support.js
 
 const fs = require("fs");
 const {
@@ -49,7 +49,7 @@ const LEVEL_UP_CHANNEL_ID = ""; // ห้องแจ้งเลเวลอั
 const LEVEL_ROLES = { 1: "1571827346523037780", 5: "1571827346523037781", 10: "1571827346523037782", 20: "1571827346523037783", 35: "1571827346523037784", 50: "1571827346523037785", 100: "1571827346523037786" }; // ยศตามเลเวล
 // ───────────────────────── ระบบบอทเข้าห้องเสียง ─────────────────────────
 const STATUS_NAME = "https://discord.gg/tV6xz4Rc4n"; // ข้อความสถานะแบบกำลังสตรีม (เว้นว่าง "" = ไม่ตั้งสถานะ)
-const STATUS_URL = "https://www.youtube.com/shorts/MC53iMD-CCg"; // ลิงก์ twitch.tv รองรับแน่นอน (ไม่ต้องไลฟ์จริง) ถ้าจะใช้ YouTube ต้องเป็นลิงก์วิดีโอ https://www.youtube.com/watch?v=xxxxxxxxxxx
+const STATUS_URL = "https://www.youtube.com/watch?v=MC53iMD-CCg"; // ลิงก์ twitch.tv รองรับแน่นอน (ไม่ต้องไลฟ์จริง) ถ้าจะใช้ YouTube ต้องเป็นลิงก์วิดีโอ https://www.youtube.com/watch?v=xxxxxxxxxxx
 const VOICE_CHANNEL_ID = "1571827351212523623"; // ห้องเสียงที่ให้บอทเข้า (เว้นว่าง "" = ไม่ใช้)
 const VOICE_SELF_MUTE = false;
 const VOICE_SELF_DEAF = true;
@@ -478,16 +478,22 @@ async function ensureVoiceJoined(guildId) {
   }
 }
 
-function startVoiceSystem(c) {
+async function startVoiceSystem(c) {
   if (STATUS_NAME) {
     const activity = STATUS_URL
       ? { name: STATUS_NAME, type: ActivityType.Streaming, url: STATUS_URL }
       : { name: STATUS_NAME, type: ActivityType.Playing };
     c.user.setPresence({ activities: [activity], status: "online" });
   }
-  if (VOICE_GUILD_ID && VOICE_CHANNEL_ID && !voiceWanted[VOICE_GUILD_ID]) {
-    voiceWanted[VOICE_GUILD_ID] = VOICE_CHANNEL_ID;
-    saveVoiceWanted();
+  // หาเซิร์ฟเวอร์จาก VOICE_CHANNEL_ID (ไม่ต้องตั้ง guild id แยก)
+  if (VOICE_CHANNEL_ID) {
+    const ch = await c.channels.fetch(VOICE_CHANNEL_ID).catch(() => null);
+    if (ch?.guildId && ch.isVoiceBased() && !voiceWanted[ch.guildId]) {
+      voiceWanted[ch.guildId] = ch.id;
+      saveVoiceWanted();
+    } else if (!ch) {
+      console.error("[VOICE] หา VOICE_CHANNEL_ID ไม่เจอ (ID ผิด หรือบอทไม่เห็นห้อง)");
+    }
   }
   for (const guildId of Object.keys(voiceWanted)) ensureVoiceJoined(guildId);
 }
@@ -788,7 +794,8 @@ async function handleOpenTicket(interaction, categoryId, type) {
 
 // ───────────────────────── events ─────────────────────────
 client.once(Events.ClientReady, async (c) => {
-  startVoiceSystem(c); // ตั้งสถานะ + เข้าห้องเสียง (ทำก่อน ไม่ขึ้นกับการลงทะเบียนคำสั่ง)
+  startVoiceSystem(c).catch((e) => console.error("[VOICE START]", e.message)); // ตั้งสถานะ + เข้าห้องเสียง (ไม่ขึ้นกับการลงทะเบียนคำสั่ง)
+  try {
   await c.application.commands.set([
     { name: "ตั้งค่าตั๋ว", description: "[เจ้าของบอท][ 🎫 ส่งแผงระบบตั๋วไปยังช่องนี้]" },
     { name: "ตั้งค่ายืนยัน", description: "[เจ้าของบอท][ ✅ ส่งแผงยืนยันตัวตนไปยังช่องนี้ ]" },
@@ -817,6 +824,9 @@ client.once(Events.ClientReady, async (c) => {
     },
     { name: "ออกห้อง", description: "[ ❌ ให้บอทออกจากห้องเสียงและเลิกเข้าห้องอัตโนมัติ ]", dm_permission: false },
   ]);
+  } catch (e) {
+    console.error("[COMMANDS] ลงทะเบียนคำสั่งไม่สำเร็จ:", e.message);
+  }
   console.log(`✅ บอทออนไลน์แล้ว: ${c.user.tag} (ID: ${c.user.id})`);
 });
 
