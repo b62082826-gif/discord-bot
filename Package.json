@@ -4,6 +4,11 @@
   "description": "Discord ticket bot (discord.js v14)",
   "main": "cat_shop_ticket_bot.js",
   "scripts": { "start": "node cat_shop_ticket_bot.js" },
-  "engines": { "node": ">=20.12" },
-  "dependencies": { "discord.js": "^14.19.0" }
+  "engines": { "node": ">=22.12" },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@snazzah/davey": "^0.1.9",
+    "discord.js": "^14.19.0",
+    "libsodium-wrappers": "^0.8.4"
+  }
 }
