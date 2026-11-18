@@ -37,7 +37,7 @@ const VERIFY_MIN_ACCOUNT_DAYS = 0; // อายุบัญชี Discord ขั
 const WELCOME_CHANNEL_ID = "1571827347722739815"; // ห้องข้อความต้อนรับสมาชิกใหม่
 const LEAVE_CHANNEL_ID = "1571827347722739817"; // ห้องแจ้งคนออก (เว้นว่าง = ใช้ห้องต้อนรับ)
 const WELCOME_IMAGE_URL = "https://i.pinimg.com/736x/4e/43/47/4e4347489e411396189a611b05645ae2.jpg"; // รูปแบนเนอร์ในข้อความต้อนรับ (ไม่ใส่ก็ได้)
-const LEVEL_UP_CHANNEL_ID = "https://i.pinimg.com/736x/aa/33/0a/aa330a77aa7bb939f807d08d868a3b6d.jpg"; // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
+const LEVEL_UP_CHANNEL_ID = "1572553862412369980"; // ห้องแจ้งเลเวลอัป (เว้นว่าง = ส่งในห้องที่เขาพิมพ์อยู่)
 const LEVEL_ROLES = { 1: "1571827346523037780", 5: "1571827346523037781", 10: "1571827346523037782", 20: "1571827346523037783", 35: "1571827346523037784", 50: "1571827346523037785", 100: "1571827346523037786" }; // ยศตามเลเวล
 const XP_MIN = 15; // XP ต่อข้อความ (สุ่มระหว่าง MIN-MAX)
 const XP_MAX = 100;
@@ -367,6 +367,10 @@ const client = new Client({
   ],
 });
 
+// ───────────────────────── Safe Role (บันทึกยศตอนออก คืนยศตอนกลับเข้ามา) ─────────────────────────
+const { installSafeRole, SAFE_ROLE_COMMAND } = require("./safe_role");
+installSafeRole(client, { ownerId: OWNER_ID, em, btnEmoji });
+
 async function sendRaw(channelId, body) {
   try {
     await client.rest.post(Routes.channelMessages(channelId), { body });
@@ -649,6 +653,7 @@ client.once(Events.ClientReady, async (c) => {
       options: [{ type: 6, name: "ผู้ใช้", description: "ดูของคนอื่น (ไม่ใส่ = ของตัวเอง)", required: false }],
     },
     { name: "อันดับ", description: "ดูอันดับเลเวล 10 อันดับแรก" },
+    SAFE_ROLE_COMMAND,
   ]);
   console.log(`✅ บอทออนไลน์แล้ว: ${c.user.tag} (ID: ${c.user.id})`);
 });
