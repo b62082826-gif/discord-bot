@@ -59,6 +59,47 @@ const VOICE_FILE = "voice_channels.json"; // เก็บห้องเสี�
 const XP_MIN = 15; // XP ต่อข้อความ (สุ่มระหว่าง MIN-MAX)
 const XP_MAX = 100;
 const XP_COOLDOWN_MS = 60_000; // นับ XP ได้ทุก ๆ กี่มิลลิวินาทีต่อคน
+// voice_bot.js — บอทเข้าห้องเสียงค้างไว้ (แปลงจาก Python nextcord เป็น JavaScript / discord.js v14)
+// ใช้ได้ทุกเซิร์ฟเวอร์: ใช้คำสั่ง /เข้าห้อง เพื่อให้บอทเข้าห้องเสียงที่ต้องการ บอทจะจำห้องไว้และเข้าเองหลังรีสตาร์ท
+//
+// ติดตั้ง:  npm install discord.js @discordjs/voice libsodium-wrappers
+// โทเค่น:   ตั้ง environment variable ชื่อ DISCORD_TOKEN (หรือไฟล์ .env บรรทัด DISCORD_TOKEN=xxxxx ใช้ Node 20.12+)
+//   Windows (cmd): set DISCORD_TOKEN=xxxxx && node voice_bot.js
+//   Linux/Mac:     DISCORD_TOKEN=xxxxx node voice_bot.js
+
+const fs = require("fs");
+const {
+  Client,
+  GatewayIntentBits,
+  Events,
+  ActivityType,
+  ChannelType,
+  PermissionFlagsBits,
+  MessageFlags,
+} = require("discord.js");
+const {
+  joinVoiceChannel,
+  getVoiceConnection,
+  entersState,
+  VoiceConnectionStatus,
+} = require("@discordjs/voice");
+
+try {
+  if (fs.existsSync(".env") && typeof process.loadEnvFile === "function") process.loadEnvFile(".env");
+} catch (e) {
+  console.error("[ENV] อ่านไฟล์ .env ไม่ได้:", e.message);
+}
+
+const BOT_TOKEN = process.env.DISCORD_TOKEN || "";
+
+// ───────────────────────── ตั้งค่า ─────────────────────────
+const STATUS_NAME = "https://discord.gg/tV6xz4Rc4n"; // ข้อความสถานะ (แบบกำลังสตรีม)
+const STATUS_URL = "https://www.youtube.com/@HIHi-s2j4q"; // ต้องเป็นลิงก์ twitch.tv หรือ youtube.com ถึงจะขึ้นสถานะสตรีม
+const DEFAULT_GUILD_ID = "1571827346477154315"; // เซิร์ฟเวอร์เริ่มต้น (เว้นว่าง "" = ไม่ใช้)
+const DEFAULT_CHANNEL_ID = "1571827351212523623"; // ห้องเสียงเริ่มต้น (เว้นว่าง "" = ไม่ใช้)
+const SELF_MUTE = false;
+const SELF_DEAF = true;
+const REJOIN_DELAY_MS = 5_000; // รอก่อนเข้าห้องใหม่เมื่อหลุด
 
 // ลิงก์ cdn.discordapp.com ที่มี ?ex=&is=&hm= จะหมดอายุ -> รูปพัง
 // แนะนำใช้ลิงก์รูปถาวร
