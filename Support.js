@@ -792,20 +792,20 @@ async function handleOpenTicket(interaction, categoryId, type) {
 client.once(Events.ClientReady, async (c) => {
   startVoiceSystem(c); // ตั้งสถานะ + เข้าห้องเสียง (ทำก่อน ไม่ขึ้นกับการลงทะเบียนคำสั่ง)
   await c.application.commands.set([
-    { name: "ตั้งค่าตั๋ว", description: "ส่งแผงระบบตั๋วไปยังช่องนี้" },
-    { name: "ตั้งค่ายืนยัน", description: "ส่งแผงยืนยันตัวตนไปยังช่องนี้" },
-    { name: "ตั้งค่าระบบ", description: "สร้างระบบรับยศ 77 จังหวัด" },
-    { name: "สร้างยศ77", description: "สร้าง Role 77 จังหวัด" },
+    { name: "ตั้งค่าตั๋ว", description: "[เจ้าของบอท][ 🎫 ส่งแผงระบบตั๋วไปยังช่องนี้]" },
+    { name: "ตั้งค่ายืนยัน", description: "[เจ้าของบอท][ ✅ ส่งแผงยืนยันตัวตนไปยังช่องนี้ ]" },
+    { name: "ตั้งค่าระบบ", description: "[เจ้าของบอท][ ✈️ สร้างระบบรับยศ 77 จังหวัด ]" },
+    { name: "สร้างยศ77", description: "[เจ้าของบอท][ ✈️ สร้าง Role 77 จังหวัด ]" },
     {
       name: "เลเวล",
-      description: "ดูเลเวลและ XP",
+      description: "[ ⛓️ ดูเลเวลและ XP ]",
       options: [{ type: 6, name: "ผู้ใช้", description: "ดูของคนอื่น (ไม่ใส่ = ของตัวเอง)", required: false }],
     },
-    { name: "อันดับ", description: "ดูอันดับเลเวล 10 อันดับแรก" },
+    { name: "อันดับ", description: "[ 📜 ดูอันดับเลเวล 10 อันดับแรก ]" },
     SAFE_ROLE_COMMAND,
     {
       name: "เข้าห้อง",
-      description: "ให้บอทเข้าห้องเสียงค้างไว้ (ไม่ระบุห้อง = ห้องที่คุณอยู่)",
+      description: "[ 🔊 ให้บอทเข้าห้องเสียงค้างไว้ ]",
       dm_permission: false,
       options: [
         {
@@ -817,7 +817,7 @@ client.once(Events.ClientReady, async (c) => {
         },
       ],
     },
-    { name: "ออกห้อง", description: "ให้บอทออกจากห้องเสียงและเลิกเข้าห้องอัตโนมัติ", dm_permission: false },
+    { name: "ออกห้อง", description: "[ ❌ ให้บอทออกจากห้องเสียงและเลิกเข้าห้องอัตโนมัติ ]", dm_permission: false },
   ]);
   console.log(`✅ บอทออนไลน์แล้ว: ${c.user.tag} (ID: ${c.user.id})`);
 });
