@@ -50,6 +50,7 @@ const LEVEL_ROLES = { 1: "1571827346523037780", 5: "1571827346523037781", 10: "1
 // ───────────────────────── ระบบบอทเข้าห้องเสียง ─────────────────────────
 const STATUS_NAME = "https://discord.gg/tV6xz4Rc4n"; // ข้อความสถานะแบบกำลังสตรีม (เว้นว่าง "" = ไม่ตั้งสถานะ)
 const STATUS_URL = "https://www.youtube.com/shorts/MC53iMD-CCg"; // ลิงก์ twitch.tv รองรับแน่นอน (ไม่ต้องไลฟ์จริง) ถ้าจะใช้ YouTube ต้องเป็นลิงก์วิดีโอ https://www.youtube.com/watch?v=xxxxxxxxxxx
+const VOICE_CHANNEL_ID = "1571827351212523623"; // ห้องเสียงที่ให้บอทเข้า (เว้นว่าง "" = ไม่ใช้)
 const VOICE_SELF_MUTE = false;
 const VOICE_SELF_DEAF = true;
 const VOICE_REJOIN_DELAY_MS = 5_000; // รอก่อนเข้าห้องใหม่เมื่อหลุด
